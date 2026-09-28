@@ -1,0 +1,31 @@
+menu "BMP180 Configuration"
+
+    config BMP180_SDA_GPIO
+        int "I2C SDA GPIO"
+        range 0 39
+        default 25
+        help
+            GPIO connected to the BMP180 SDA pin.
+
+    config BMP180_SCL_GPIO
+        int "I2C SCL GPIO"
+        range 0 39
+        default 26
+        help
+            GPIO connected to the BMP180 SCL pin.
+
+    config BMP180_SEA_LEVEL_PRESSURE_PA
+        int "Sea-level reference pressure (Pa)"
+        range 30000 120000
+        default 101325
+        help
+            Reference pressure used to calculate altitude.
+
+    config BMP180_UPDATE_INTERVAL_MS
+        int "Measurement interval (ms)"
+        range 100 60000
+        default 2000
+        help
+            Delay between consecutive sensor readings.
+
+endmenu
