@@ -1,53 +1,116 @@
-| Supported Targets | ESP32 | ESP32-C2 | ESP32-C3 | ESP32-C5 | ESP32-C6 | ESP32-C61 | ESP32-H2 | ESP32-P4 | ESP32-S2 | ESP32-S3 | Linux |
-| ----------------- | ----- | -------- | -------- | -------- | -------- | --------- | -------- | -------- | -------- | -------- | ----- |
+# ESP32 BMP180
 
-# Hello World Example
+Project ESP-IDF đọc cảm biến nhiệt độ và áp suất BMP180 qua giao tiếp I2C. Chương trình hiển thị nhiệt độ, áp suất và độ cao ước tính trên serial monitor theo chu kỳ cấu hình.
 
-Starts a FreeRTOS task to print "Hello World".
+## Yêu cầu
 
-(See the README.md file in the upper level 'examples' directory for more information about examples.)
+- ESP-IDF 5.3 trở lên
+- ESP32 development board
+- Cảm biến BMP180
+- Flash mặc định: 4 MB
 
-## How to use example
+Ví dụ mặc định sử dụng ESP32 classic với GPIO 25 và GPIO 26. Nếu sử dụng ESP32-C3 hoặc một dòng chip khác, cần chọn các GPIO hợp lệ trong `menuconfig`.
 
-Follow detailed instructions provided specifically for this example.
+## Kết nối phần cứng
 
-Select the instructions depending on Espressif chip installed on your development board:
+| BMP180 | ESP32 mặc định |
+|--------|----------------|
+| VCC    | 3V3            |
+| GND    | GND            |
+| SDA    | GPIO 25        |
+| SCL    | GPIO 26        |
 
-- [ESP32 Getting Started Guide](https://docs.espressif.com/projects/esp-idf/en/stable/get-started/index.html)
-- [ESP32-S2 Getting Started Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s2/get-started/index.html)
+Địa chỉ I2C mặc định của BMP180 là `0x77`. Module thường đã có điện trở kéo lên I2C; nếu dùng cảm biến rời, cần bổ sung điện trở kéo lên SDA và SCL.
 
+## Cấu hình
 
-## Example folder contents
+Mở giao diện cấu hình:
 
-The project **esp32-bmp180** contains one source file in C language [esp32_bmp180_main.c](main/esp32_bmp180_main.c). The file is located in folder [main](main).
-
-ESP-IDF projects are built using CMake. The project build configuration is contained in `CMakeLists.txt` files that provide set of directives and instructions describing the project's source files and targets (executable, library, or both).
-
-Below is short explanation of remaining files in the project folder.
-
-```
-├── CMakeLists.txt
-├── pytest_esp32_bmp180.py     Python script used for automated testing
-├── main
-│   ├── CMakeLists.txt
-│   └── esp32_bmp180_main.c
-└── README.md                  This is the file you are currently reading
+```bash
+idf.py menuconfig
 ```
 
-For more information on structure and contents of ESP-IDF projects, please refer to Section [Build System](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/build-system.html) of the ESP-IDF Programming Guide.
+Trong menu **BMP180 Configuration** có thể thay đổi:
 
-## Troubleshooting
+- `I2C SDA GPIO`: chân SDA, mặc định `25`
+- `I2C SCL GPIO`: chân SCL, mặc định `26`
+- `Sea-level reference pressure`: áp suất tham chiếu để tính độ cao, mặc định `101325 Pa`
+- `Measurement interval`: chu kỳ đọc cảm biến, mặc định `2000 ms`
 
-* Program upload failure
+Flash size được đặt mặc định là 4 MB trong `sdkconfig.defaults`. Có thể kiểm tra tại:
 
-    * Hardware connection is not correct: run `idf.py -p PORT monitor`, and reboot your board to see if there are any output logs.
-    * The baud rate for downloading is too high: lower your baud rate in the `menuconfig` menu, and try again.
+```text
+Serial flasher config -> Flash size -> 4 MB
+```
 
-## Technical support and feedback
+## Chọn target
 
-Please use the following feedback channels:
+Với ESP32 classic:
 
-* For technical queries, go to the [esp32.com](https://esp32.com/) forum
-* For a feature request or bug report, create a [GitHub issue](https://github.com/espressif/esp-idf/issues)
+```bash
+idf.py set-target esp32
+```
 
-We will get back to you as soon as possible.
+Sau khi đổi target, mở lại `menuconfig` để kiểm tra chân GPIO và flash size.
+
+## Build và nạp chương trình
+
+```bash
+idf.py build
+idf.py -p COMx flash monitor
+```
+
+Thay `COMx` bằng cổng serial của board, ví dụ `COM5`. Nhấn `Ctrl+]` để thoát monitor.
+
+Kết quả dự kiến:
+
+```text
+Nhiet do = 27.40 *C
+Ap suat  = 1008.52 hPa
+Do cao   = 40.12 met
+--------------------------------
+```
+
+## Cấu trúc project
+
+```text
+esp32-bmp180/
+|-- CMakeLists.txt
+|-- sdkconfig.defaults
+|-- lib/
+|   `-- bmp180/
+|       |-- CMakeLists.txt
+|       |-- bmp180.c
+|       `-- bmp180.h
+|-- main/
+|   |-- CMakeLists.txt
+|   |-- Kconfig.projbuild
+|   `-- esp32_bmp180_main.c
+`-- README.md
+```
+
+Driver BMP180 được đóng gói thành component `bmp180`. Component `main` sử dụng các API:
+
+```c
+bmp180_init(sda_gpio, scl_gpio);
+bmp180_read_temperature(&temperature_c);
+bmp180_read_pressure(&pressure_pa);
+bmp180_read_altitude(reference_pressure_pa, &altitude_m);
+```
+
+## Xử lý sự cố
+
+### Không tìm thấy BMP180
+
+- Kiểm tra VCC đang nối với `3V3`, không dùng 5 V nếu module không hỗ trợ.
+- Kiểm tra đúng chân SDA/SCL đã chọn trong `menuconfig`.
+- Kiểm tra địa chỉ `0x77` bằng chương trình quét I2C.
+- Đảm bảo SDA và SCL có điện trở kéo lên.
+
+### GPIO 25/26 không hoạt động
+
+GPIO 25 và 26 là cấu hình mặc định cho ESP32 classic. ESP32-C3 không có hai GPIO này; hãy chọn các chân hợp lệ của board trong **BMP180 Configuration**.
+
+### Giá trị độ cao chưa chính xác
+
+Độ cao được suy ra từ áp suất tham chiếu. Hãy cập nhật `Sea-level reference pressure` theo áp suất mực nước biển tại vị trí và thời điểm đo để có kết quả tốt hơn.
