@@ -10,7 +10,7 @@ Wi-Fi tự kết nối lại khi mất mạng.
 ## Cấu hình và chạy
 
 1. Chạy `idf.py menuconfig`, mở **ThingSpeak Configuration**.
-2. Nhập **Wi-Fi SSID**, **Wi-Fi password** và **DHT11 data GPIO** (mặc định 27).
+2. Nhập **Wi-Fi SSID**, **Wi-Fi password** và **DHT11 data GPIO** (mặc định 32).
 3. Nối DHT11 DATA vào GPIO đã chọn, VCC vào 3V3, GND vào GND; dùng điện trở
    kéo lên DATA nếu module chưa có. BMP180 giữ SDA 25, SCL 26 theo cấu hình.
 4. Bật field1, field2, field3 trong Channel Settings của ThingSpeak.
