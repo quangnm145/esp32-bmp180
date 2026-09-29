@@ -1,171 +1,116 @@
-#include <inttypes.h>
-#include <stdio.h>
-#include <string.h>
+#include <stdbool.h>
 
-#include "bmp180.h"
-#include "dht11.h"
-#include "thingspeak.h"
-#include "esp_event.h"
-#include "esp_netif.h"
-#include "esp_wifi.h"
-#include "nvs_flash.h"
+#include "app_config.h"
+#include "app_tick.h"
+#include "data_pool.h"
 #include "esp_err.h"
 #include "esp_log.h"
-#include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "freertos/event_groups.h"
+#include "sdkconfig.h"
+#include "sensor_service.h"
+#include "status_led.h"
+#include "thingspeak.h"
+#include "web_server.h"
+#include "wifi_manager.h"
 
 static const char *TAG = "ESP32_MAIN";
-static EventGroupHandle_t wifi_events;
-#define WIFI_CONNECTED_BIT BIT0
 
-static void wifi_event_handler(void *arg, esp_event_base_t base,
-                               int32_t id, void *data)
+#define APP_TICK_PERIOD_MS  1000
+#define HEARTBEAT_PERIOD_MS (60 * 1000)
+
+static void on_connection_changed(bool connected)
 {
-    if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
-        esp_wifi_connect();
-    } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
-        xEventGroupClearBits(wifi_events, WIFI_CONNECTED_BIT);
-        ESP_LOGW(TAG, "Mat Wi-Fi, dang ket noi lai...");
-        esp_wifi_connect();
-    } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
-        xEventGroupSetBits(wifi_events, WIFI_CONNECTED_BIT);
-        ESP_LOGI(TAG, "Wi-Fi da nhan IP");
-    }
+    status_led_set_mode(connected ? STATUS_LED_CONNECTED : STATUS_LED_DISCONNECTED);
 }
 
-static void wifi_init(void)
+/* Ghi log loi va tra ve true neu buoc khoi dong that bai. */
+static bool failed(esp_err_t err, const char *step)
 {
-    esp_err_t err = nvs_flash_init();
-    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        err = nvs_flash_init();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "%s that bai: %s", step, esp_err_to_name(err));
+        return true;
     }
-    ESP_ERROR_CHECK(err);
-    wifi_events = xEventGroupCreate();
-    configASSERT(wifi_events != NULL);
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_t *netif = esp_netif_create_default_wifi_sta();
-    configASSERT(netif != NULL);
-    wifi_init_config_t init = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&init));
-    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID,
-                                               wifi_event_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP,
-                                               wifi_event_handler, NULL));
-    wifi_config_t config = {
-        .sta = {
-            .ssid = CONFIG_THINGSPEAK_WIFI_SSID,
-            .password = CONFIG_THINGSPEAK_WIFI_PASSWORD,
-        },
-    };
-    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &config));
-    ESP_ERROR_CHECK(esp_wifi_start());
+    return false;
+}
+
+/* Dinh ky in IP de nguoi dung luon thay dia chi trang cau hinh trong log. */
+static void heartbeat_loop(void)
+{
+    while (true) {
+        vTaskDelay(pdMS_TO_TICKS(HEARTBEAT_PERIOD_MS));
+
+        wifi_manager_status_t wifi;
+        wifi_manager_get_status(&wifi);
+        data_pool_stats_t pool;
+        data_pool_get_stats(&pool);
+        if (wifi.state == WIFI_MANAGER_CONNECTED) {
+            ESP_LOGI(TAG, "Wi-Fi \"%s\" IP http://%s (RSSI %d) | AP \"%s\" http://%s | pool %u/%u",
+                     wifi.ssid, wifi.sta_ip, wifi.rssi, wifi.ap_ssid, wifi.ap_ip,
+                     (unsigned)pool.count, (unsigned)pool.capacity);
+        } else {
+            ESP_LOGI(TAG, "Chua ket noi Wi-Fi | AP \"%s\" http://%s | pool %u/%u",
+                     wifi.ap_ssid, wifi.ap_ip, (unsigned)pool.count, (unsigned)pool.capacity);
+        }
+    }
 }
 
 void app_main(void)
 {
-    vTaskDelay(pdMS_TO_TICKS(1000));
-    ESP_LOGI(TAG, "--- Test BMP180: SDA=%d, SCL=%d ---",
-             CONFIG_BMP180_SDA_GPIO, CONFIG_BMP180_SCL_GPIO);
-
-    esp_err_t err = bmp180_init(CONFIG_BMP180_SDA_GPIO,
-                                CONFIG_BMP180_SCL_GPIO);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Khong tim thay cam bien BMP180: %s", esp_err_to_name(err));
-        ESP_LOGE(TAG, "Kiem tra SDA -> GPIO %d, SCL -> GPIO %d",
-                 CONFIG_BMP180_SDA_GPIO, CONFIG_BMP180_SCL_GPIO);
-        ESP_LOGE(TAG, "Kiem tra VCC -> 3V3 va GND -> GND");
-
-        while (true) {
-            vTaskDelay(pdMS_TO_TICKS(1000));
-        }
-    }
-
-    ESP_LOGI(TAG, "Ket noi BMP180 thanh cong!");
-
-    dht11_t dht = {.dht11_pin = CONFIG_DHT11_GPIO};
-    if (!GPIO_IS_VALID_OUTPUT_GPIO(CONFIG_DHT11_GPIO) ||
-        CONFIG_DHT11_GPIO == CONFIG_BMP180_SDA_GPIO ||
-        CONFIG_DHT11_GPIO == CONFIG_BMP180_SCL_GPIO) {
-        ESP_LOGE(TAG, "GPIO DHT11 khong hop le hoac trung chan I2C");
+    if (failed(app_config_init(), "app_config_init")) {
         return;
     }
-    ESP_ERROR_CHECK(gpio_set_direction(dht.dht11_pin, GPIO_MODE_INPUT));
-    ESP_ERROR_CHECK(gpio_set_pull_mode(dht.dht11_pin, GPIO_PULLUP_ONLY));
 
-    QueueHandle_t samples = xQueueCreate(1, sizeof(thingspeak_sample_t));
-    configASSERT(samples != NULL);
-    bool sender_started = false;
-    bool wifi_configured = strlen(CONFIG_THINGSPEAK_WIFI_SSID) > 0;
-    if (wifi_configured) {
-        wifi_init();
-    } else {
-        ESP_LOGW(TAG, "Cau hinh Wi-Fi trong menuconfig -> ThingSpeak Configuration");
+    if (!failed(status_led_init((gpio_num_t)CONFIG_APP_STATUS_LED_GPIO), "status_led_init")) {
+        status_led_set_mode(STATUS_LED_DISCONNECTED);
     }
 
-    while (true) {
-        bool valid_sample = true;
-        float temperature_c;
-        uint32_t pressure_pa;
-        float altitude_m;
-
-        err = bmp180_read_temperature(&temperature_c);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Loi doc nhiet do: %s", esp_err_to_name(err));
-            valid_sample = false;
-        } else {
-            printf("Nhiet do = %.2f *C\n", temperature_c);
-        }
-
-        err = bmp180_read_pressure(&pressure_pa);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Loi doc ap suat: %s", esp_err_to_name(err));
-            valid_sample = false;
-        } else {
-            printf("Ap suat  = %.2f hPa\n", pressure_pa / 100.0f);
-        }
-
-        err = bmp180_read_altitude(CONFIG_BMP180_SEA_LEVEL_PRESSURE_PA,
-                                   &altitude_m);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Loi tinh do cao: %s", esp_err_to_name(err));
-        } else {
-            printf("Do cao   = %.2f met\n", altitude_m);
-        }
-
-        if (dht11_read(&dht, 1) == 0) {
-            printf("Do am    = %.2f %%\n", dht.humidity);
-        } else {
-            ESP_LOGW(TAG, "Loi doc DHT11, bo qua mau gui ThingSpeak");
-            valid_sample = false;
-        }
-
-        if (wifi_configured &&
-            (xEventGroupGetBits(wifi_events) & WIFI_CONNECTED_BIT)) {
-            if (!sender_started) {
-                sender_started = xTaskCreate(send_data_to_thingspeak, "thingspeak",
-                                             8192, samples, 5, NULL) == pdPASS;
-                if (!sender_started) {
-                    ESP_LOGE(TAG, "Khong tao duoc task ThingSpeak");
-                }
-            }
-            if (valid_sample && sender_started) {
-                thingspeak_sample_t sample = {
-                    .temperature_c = temperature_c,
-                    .pressure_hpa = pressure_pa / 100.0f,
-                    .humidity_percent = dht.humidity,
-                };
-                xQueueOverwrite(samples, &sample);
-            }
-        }
-        printf("--------------------------------\n");
-        /* DHT11 requires at least two seconds between measurements. */
-        vTaskDelay(pdMS_TO_TICKS(CONFIG_BMP180_UPDATE_INTERVAL_MS < 2000
-                                    ? 2000 : CONFIG_BMP180_UPDATE_INTERVAL_MS));
+    if (failed(data_pool_init(), "data_pool_init")) {
+        return;
     }
+
+    const wifi_manager_config_t wifi_config = {
+        .ap_ssid = CONFIG_APP_AP_SSID,
+        .ap_ip = CONFIG_APP_AP_IP,
+        .on_connection_changed = on_connection_changed,
+    };
+    if (failed(wifi_manager_start(&wifi_config), "wifi_manager_start")) {
+        return;
+    }
+
+    const web_server_config_t web_config = {
+        .username = CONFIG_APP_WEB_USERNAME,
+        .password = CONFIG_APP_WEB_PASSWORD,
+    };
+    /* Web loi van tiep tuc do va gui du lieu. */
+    failed(web_server_start(&web_config), "web_server_start");
+
+    TaskHandle_t ts_task = NULL;
+    if (failed(thingspeak_worker_start(wifi_manager_is_connected, &ts_task),
+               "thingspeak_worker_start")) {
+        return;
+    }
+
+    const sensor_service_config_t sensor_config = {
+        .bmp180_sda_gpio = CONFIG_BMP180_SDA_GPIO,
+        .bmp180_scl_gpio = CONFIG_BMP180_SCL_GPIO,
+        .dht11_gpio = CONFIG_DHT11_GPIO,
+        .sea_level_pressure_pa = CONFIG_BMP180_SEA_LEVEL_PRESSURE_PA,
+        .consumer_task = ts_task,
+        .consumer_notify_bits = THINGSPEAK_NOTIFY_DATA,
+    };
+    TaskHandle_t sensor_task = NULL;
+    if (failed(sensor_service_start(&sensor_config, &sensor_task), "sensor_service_start")) {
+        return;
+    }
+
+    if (failed(app_tick_subscribe(sensor_task, SENSOR_NOTIFY_TICK), "app_tick_subscribe(sensor)") ||
+        failed(app_tick_subscribe(ts_task, THINGSPEAK_NOTIFY_TICK), "app_tick_subscribe(thingspeak)") ||
+        failed(app_tick_start(APP_TICK_PERIOD_MS), "app_tick_start")) {
+        return;
+    }
+
+    ESP_LOGI(TAG, "Khoi dong xong: tick %d ms, AP \"%s\" http://%s",
+             APP_TICK_PERIOD_MS, CONFIG_APP_AP_SSID, CONFIG_APP_AP_IP);
+    heartbeat_loop();
 }

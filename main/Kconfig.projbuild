@@ -21,23 +21,9 @@ menu "BMP180 Configuration"
         help
             Reference pressure used to calculate altitude.
 
-    config BMP180_UPDATE_INTERVAL_MS
-        int "Measurement interval (ms)"
-        range 100 60000
-        default 5000
-        help
-            Delay between consecutive sensor readings.
-
 endmenu
 
 menu "ThingSpeak Configuration"
-    config THINGSPEAK_WIFI_SSID
-        string "Wi-Fi SSID"
-        default ""
-
-    config THINGSPEAK_WIFI_PASSWORD
-        string "Wi-Fi password"
-        default ""
 
     config DHT11_GPIO
         int "DHT11 data GPIO"
@@ -45,4 +31,96 @@ menu "ThingSpeak Configuration"
         default 32
         help
             Use an output-capable GPIO different from the BMP180 I2C pins.
+
+endmenu
+
+menu "IoT Device Configuration"
+
+    config APP_AP_SSID
+        string "Configuration AP SSID"
+        default "IOT_Device"
+        help
+            Open Wi-Fi access point the device always broadcasts for configuration.
+
+    config APP_AP_IP
+        string "Configuration AP IP address"
+        default "192.168.1.14"
+        help
+            Static IPv4 address of the configuration AP (netmask /24).
+
+    config APP_WEB_USERNAME
+        string "Web page username"
+        default "admin"
+        help
+            HTTP Basic Auth username of the configuration web page.
+
+    config APP_WEB_PASSWORD
+        string "Web page password"
+        default "admin"
+        help
+            HTTP Basic Auth password of the configuration web page.
+
+    config APP_STATUS_LED_GPIO
+        int "Status LED GPIO"
+        range 0 33
+        default 2
+        help
+            GPIO driving the status LED (blue LED on GPIO2 of ESP32 DevKit).
+
+    config APP_DEFAULT_PERIOD_S
+        int "Default sampling/upload period (s)"
+        range 5 3600
+        default 20
+        help
+            Default period used until a value is saved from the web page.
+
+    config APP_DEFAULT_TS_ENABLED
+        bool "Enable ThingSpeak upload by default"
+        default n
+        help
+            Default ThingSpeak state when nothing is saved in NVS.
+            Only takes effect when a default write API key is set.
+
+    config APP_DEFAULT_TS_CHANNEL_ID
+        int "Default ThingSpeak channel ID"
+        range 0 2147483647
+        default 0
+        help
+            0 disables bulk update (only the newest sample is sent via /update).
+
+    config APP_DEFAULT_TS_WRITE_KEY
+        string "Default ThingSpeak write API key"
+        default ""
+        help
+            Put real keys in sdkconfig.secrets (git-ignored), not in sdkconfig.defaults.
+
+    config APP_DEFAULT_WIFI_SSID
+        string "Default Wi-Fi SSID"
+        default ""
+        help
+            Used only when no Wi-Fi is saved in NVS. Put real values in sdkconfig.secrets.
+
+    config APP_TS_HISTORY_CHANNEL_ID
+        int "ThingSpeak history channel ID"
+        range 0 2147483647
+        default 0
+
+    config APP_TS_HISTORY_READ_KEY
+        string "ThingSpeak history read API key"
+        default ""
+        help
+            Set in sdkconfig.secrets. Used only by the ESP32 history downloader.
+
+    config APP_DEFAULT_WIFI_PASSWORD
+        string "Default Wi-Fi password"
+        default ""
+
+    config APP_SENSOR_FAKE_DATA
+        bool "Fake sensor data (test mode without sensors)"
+        default n
+        help
+            Test mode without sensors: BMP180/DHT11 are not accessed; the sensor
+            service generates triangle-wave values with noise and periodic spikes
+            and feeds them through the normal filter pipeline.
+
 endmenu

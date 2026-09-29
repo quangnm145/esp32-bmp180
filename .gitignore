@@ -4,6 +4,9 @@ build-*/
 sdkconfig
 sdkconfig.old
 
+# Local secrets (ThingSpeak keys)
+sdkconfig.secrets
+
 # Managed component download/cache
 managed_components/
 
