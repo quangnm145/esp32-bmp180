@@ -42,7 +42,7 @@ menu "ThingSpeak Configuration"
     config DHT11_GPIO
         int "DHT11 data GPIO"
         range 0 33
-        default 27
+        default 32
         help
             Use an output-capable GPIO different from the BMP180 I2C pins.
 endmenu
