@@ -22,4 +22,6 @@ trả về true, pool có dữ liệu và đã qua `THINGSPEAK_MIN_INTERVAL_MS` 
 Object chỉ bị xoá khỏi pool sau khi gửi thành công; lỗi mạng thì giữ lại để lần sau gửi tiếp.
 
 Anh xạ field nằm trong bảng `FIELD_MAP` (`thingspeak.c`):
-field1 nhiệt độ BMP180, field2 áp suất hPa, field3 độ ẩm, field4 nhiệt độ DHT11.
+field1 nhiệt độ BMP180, field2 áp suất hPa, field3 độ ẩm, field4 nhiệt độ DHT11,
+field5 độ cao (m). Độ cao chỉ được gửi khi mẫu BMP180 hợp lệ, áp dụng cả
+gửi đơn và bulk update. Bật field5 trên channel trước khi dùng firmware này.

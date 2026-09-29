@@ -1,4 +1,5 @@
 #include "web_server.h"
+#include "sensor_history.h"
 
 #include <inttypes.h>
 #include <stdio.h>
@@ -237,6 +238,12 @@ static esp_err_t status_get_handler(httpd_req_t *req)
     cJSON_AddNumberToObject(root, "uptime_s", (double)(now_us / 1000000));
     cJSON_AddNumberToObject(root, "free_heap", esp_get_free_heap_size());
     return send_json(req, NULL, root);
+}
+
+static esp_err_t history_get_handler(httpd_req_t *req)
+{
+    if (!check_auth(req)) return ESP_OK;
+    return sensor_history_get(req);
 }
 
 static esp_err_t scan_get_handler(httpd_req_t *req)
@@ -529,6 +536,7 @@ esp_err_t web_server_start(const web_server_config_t *config)
     const httpd_uri_t uris[] = {
         {.uri = "/", .method = HTTP_GET, .handler = index_get_handler},
         {.uri = "/api/status", .method = HTTP_GET, .handler = status_get_handler},
+        {.uri = "/api/sensors/history", .method = HTTP_GET, .handler = history_get_handler},
         {.uri = "/api/scan", .method = HTTP_GET, .handler = scan_get_handler},
         {.uri = "/api/wifi", .method = HTTP_POST, .handler = wifi_post_handler},
         {.uri = "/api/thingspeak", .method = HTTP_GET, .handler = thingspeak_get_handler},

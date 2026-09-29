@@ -22,6 +22,9 @@ main{padding:16px 0 40px}
 section{display:none}section.on{display:block}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
 .card h2{font-size:15px;margin:0 0 12px}
+.chart{width:100%;height:220px;display:block}
+.chart-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.chart-head output{font-weight:700;font-variant-numeric:tabular-nums}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .m{background:var(--bg);border-radius:10px;padding:10px 12px}
 .m b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
@@ -68,6 +71,7 @@ ul.nets>li{border-top:1px solid var(--line)}
 <nav id="tabs">
 <button data-t="st" class="on">Trạng thái</button>
 <button data-t="wf">Wi-Fi</button>
+<button data-t="sn">Cảm biến</button>
 <button data-t="ts">ThingSpeak</button>
 <button data-t="sy">Hệ thống</button>
 </nav>
@@ -114,6 +118,16 @@ ul.nets>li{border-top:1px solid var(--line)}
 <div id="w_msg" class="msg"></div>
 <ul class="nets" id="nets"></ul>
 </div>
+</section>
+
+<section id="sn">
+<div class="card"><h2>Biểu đồ cảm biến</h2>
+<p class="note">Tải 50 mẫu gần nhất từ ThingSpeak khi mở trang, sau đó cập nhật số đo trực tiếp. Lịch sử được làm mới mỗi phút. Các mẫu cũ chưa lưu độ cao sẽ để trống trên biểu đồ.</p>
+<div class="row"><button class="btn" id="history_reload">Tải lại lịch sử</button></div>
+<p class="note" id="history_status" role="status">Lịch sử sẽ được tải khi mở tab Cảm biến.</p>
+<p class="note" id="chart_status" role="status">Đang chờ dữ liệu cảm biến…</p>
+</div>
+<div id="sensor_charts"></div>
 </section>
 
 <section id="ts">
@@ -169,13 +183,139 @@ function show(t){
   for(var i=0;i<tabs.length;i++)tabs[i].classList.toggle("on",tabs[i].dataset.t===t);
   var s=document.querySelectorAll("section");for(i=0;i<s.length;i++)s[i].classList.toggle("on",s[i].id===t);
   if(t==="ts"&&!tsLoaded)loadTs();
+  if(t==="sn"){requestAnimationFrame(drawCharts);loadHistory();}
   try{localStorage.setItem("tab",t);}catch(e){}
 }
 for(var i=0;i<tabs.length;i++)tabs[i].onclick=function(){show(this.dataset.t);};
 
+/* Sensor charts: bounded browser history; no external dependencies. */
+var chartFields=[
+  {key:"bmp_temperature_c",name:"Nhiệt độ BMP180",unit:"°C",digits:2,valid:"bmp180_valid",color:"#e87932"},
+  {key:"pressure_hpa",name:"Áp suất BMP180",unit:"hPa",digits:2,valid:"bmp180_valid",color:"#4f8cff"},
+  {key:"altitude_m",name:"Độ cao BMP180",unit:"m",digits:1,valid:"bmp180_valid",color:"#a78bfa"},
+  {key:"humidity_percent",name:"Độ ẩm DHT11",unit:"%",digits:1,valid:"dht11_valid",color:"#14b8a6"},
+  {key:"dht_temperature_c",name:"Nhiệt độ DHT11",unit:"°C",digits:1,valid:"dht11_valid",color:"#e85d91"}
+];
+var chartHistory=[],localHistory=[],cloudHistory=[],lastSeq=null,lastUptime=null;
+var historyLoading=false,historyLoadedAt=0;
+chartFields.forEach(function(f){
+  var card=document.createElement("div");card.className="card";
+  card.innerHTML='<div class="chart-head"><h2>'+f.name+'</h2><output id="value_'+f.key+'">–</output></div>'+
+    '<canvas class="chart" id="chart_'+f.key+'" role="img" aria-label="Biểu đồ '+f.name+' ('+f.unit+')"></canvas>';
+  $("sensor_charts").appendChild(card);
+});
+function chartValue(s,f){return s[f.valid]&&typeof s[f.key]==="number"&&Number.isFinite(s[f.key])?s[f.key]:null;}
+function rebuildHistory(){
+  var lastCloud=cloudHistory.length?cloudHistory[cloudHistory.length-1].time:-Infinity;
+  chartHistory=cloudHistory.concat(localHistory.filter(function(p){return p.time>lastCloud+1000;}))
+    .sort(function(a,b){return a.time-b.time;}).slice(-170);
+}
+function readField(v){
+  if(v===null||v===undefined||String(v).trim()==="")return null;
+  var n=Number(v);return Number.isFinite(n)?n:null;
+}
+function loadHistory(force){
+  if(historyLoading||(!force&&Date.now()-historyLoadedAt<60000))return;
+  historyLoading=true;$("history_reload").disabled=true;
+  $("history_status").textContent="Đang tải lịch sử từ ThingSpeak…";
+  var attempts=0;
+  function finish(){historyLoading=false;$("history_reload").disabled=false;}
+  function poll(){
+    api("/api/sensors/history").then(function(j){
+      if(j.loading){
+        if(++attempts>=30)throw new Error("Tải lịch sử quá lâu. Hãy thử lại.");
+        setTimeout(poll,1000);return;
+      }
+      if(!Array.isArray(j.feeds))throw new Error("Dữ liệu lịch sử không hợp lệ");
+      var seen={};
+      cloudHistory=j.feeds.filter(function(f){
+        if(seen[f.entry_id]||!Number.isFinite(Date.parse(f.created_at)))return false;
+        seen[f.entry_id]=true;return true;
+      }).map(function(f){
+        return {time:Date.parse(f.created_at),sensor:{
+          bmp180_valid:true,dht11_valid:true,
+          bmp_temperature_c:readField(f.field1),pressure_hpa:readField(f.field2),
+          humidity_percent:readField(f.field3),dht_temperature_c:readField(f.field4),altitude_m:readField(f.field5)
+        },breakBefore:false};
+      }).sort(function(a,b){return a.time-b.time;}).slice(-50);
+      historyLoadedAt=Date.now();rebuildHistory();
+      if(lastSeq===null&&cloudHistory.length){
+        chartFields.forEach(function(f){$("value_"+f.key).textContent=num(chartValue(cloudHistory[cloudHistory.length-1].sensor,f),f.digits," "+f.unit);});
+      }
+      $("history_status").textContent=cloudHistory.length?
+        "Đã tải "+cloudHistory.length+" mẫu từ ThingSpeak · Cập nhật lúc "+new Date().toLocaleTimeString("vi-VN"):
+        "Channel chưa có dữ liệu lịch sử. Số đo trực tiếp vẫn tiếp tục cập nhật.";
+      drawCharts();finish();
+    }).catch(function(e){
+      $("history_status").textContent="Không tải được lịch sử: "+e.message+". Dữ liệu hiện có vẫn được giữ lại.";
+      finish();
+    });
+  }
+  poll();
+}
+$("history_reload").onclick=function(){loadHistory(true);};
+setInterval(function(){if($("sn").classList.contains("on"))loadHistory();},60000);
+function recordSensor(j){
+  var s=j.sensor;
+  if(lastUptime!==null&&j.uptime_s<lastUptime){localHistory=[];lastSeq=null;rebuildHistory();}
+  lastUptime=j.uptime_s;
+  chartFields.forEach(function(f){$("value_"+f.key).textContent=num(chartValue(s,f),f.digits," "+f.unit);});
+  $("chart_status").textContent=s.age_s<0?"Chưa có mẫu dữ liệu.":
+    "Mẫu #"+s.seq+" · Đo cách đây "+dur(s.age_s)+
+    (!s.bmp180_valid?" · BMP180 lỗi":"")+(!s.dht11_valid?" · DHT11 lỗi":"");
+  if(s.seq>0&&s.seq!==lastSeq&&s.age_s>=0){
+    localHistory.push({time:Date.now()-s.age_s*1000,sensor:s,breakBefore:lastSeq!==null&&s.seq!==lastSeq+1});
+    if(localHistory.length>120)localHistory.shift();
+    lastSeq=s.seq;
+    rebuildHistory();
+  }
+  drawCharts();
+}
+function drawCharts(){
+  if(!$("sn").classList.contains("on"))return;
+  var style=getComputedStyle(document.documentElement);
+  chartFields.forEach(function(f){
+    var points=chartHistory;
+    var canvas=$("chart_"+f.key),width=canvas.clientWidth,height=220;
+    if(!width)return;
+    var scale=window.devicePixelRatio||1;
+    canvas.width=Math.round(width*scale);canvas.height=Math.round(height*scale);
+    var ctx=canvas.getContext("2d");if(!ctx)return;
+    ctx.scale(scale,scale);ctx.font="12px system-ui";
+    var values=points.map(function(p){return chartValue(p.sensor,f);}).filter(function(v){return v!==null;});
+    ctx.fillStyle=style.getPropertyValue("--mut");
+    if(!values.length){ctx.textAlign="center";ctx.fillText("Chưa có số đo hợp lệ",width/2,height/2);return;}
+    var lo=Math.min.apply(null,values),hi=Math.max.apply(null,values),pad=Math.max((hi-lo)*0.15,0.5);
+    lo-=pad;hi+=pad;
+    var left=70,right=width-16,top=12,bottom=height-34;
+    var first=points[0].time,last=points[points.length-1].time;
+    function x(p){return first===last?(left+right)/2:left+(p.time-first)/(last-first)*(right-left);}
+    function y(v){return bottom-(v-lo)/(hi-lo)*(bottom-top);}
+    for(var k=0;k<=4;k++){
+      var v=lo+(hi-lo)*k/4,py=y(v);ctx.strokeStyle=style.getPropertyValue("--line");
+      ctx.beginPath();ctx.moveTo(left,py);ctx.lineTo(right,py);ctx.stroke();
+      ctx.textAlign="right";ctx.fillText(v.toFixed(f.digits),left-8,py+4);
+    }
+    ctx.textAlign="left";ctx.fillText(new Date(first).toLocaleTimeString("vi-VN"),left,height-8);
+    if(first!==last){ctx.textAlign="right";ctx.fillText(new Date(last).toLocaleTimeString("vi-VN"),right,height-8);}
+    ctx.strokeStyle=f.color;ctx.fillStyle=f.color;ctx.lineWidth=2;
+    ctx.beginPath();var connected=false;
+    points.forEach(function(p){
+      var v=chartValue(p.sensor,f);if(v===null){connected=false;return;}
+      if(connected&&!p.breakBefore)ctx.lineTo(x(p),y(v));else ctx.moveTo(x(p),y(v));connected=true;
+    });ctx.stroke();
+    points.forEach(function(p){var v=chartValue(p.sensor,f);if(v!==null){ctx.beginPath();ctx.arc(x(p),y(v),2.5,0,Math.PI*2);ctx.fill();}});
+    canvas.setAttribute("aria-label",f.name+": "+values.length+" số đo, mới nhất "+$("value_"+f.key).textContent);
+  });
+}
+window.addEventListener("resize",drawCharts);
+if(window.matchMedia){var theme=window.matchMedia("(prefers-color-scheme:dark)");if(theme.addEventListener)theme.addEventListener("change",drawCharts);}
+
 /* Trang thai */
+var statusRequest=null;
 function status(){
-  return api("/api/status").then(function(j){
+  if(statusRequest)return statusRequest;
+  statusRequest=api("/api/status").then(function(j){
     var w=j.wifi,s=j.sensor,p=j.pool,t=j.thingspeak,h=$("hdr");
     h.textContent=ST[w.state]||w.state;
     h.className="pill "+(w.state==="connected"?"ok":w.state==="connecting"?"warn":"err");
@@ -201,8 +341,13 @@ function status(){
     $("t_ti").textContent=t.time_synced?"Đã đồng bộ":"Chưa";
     $("d_up").textContent=dur(j.uptime_s);
     $("d_hp").textContent=Math.round(j.free_heap/1024)+" KB";
+    recordSensor(j);
     return j;
-  });
+  }).catch(function(e){
+    $("chart_status").textContent="Mất kết nối thiết bị. Đang thử lại; biểu đồ đang hiển thị dữ liệu cũ.";
+    throw e;
+  }).finally(function(){statusRequest=null;});
+  return statusRequest;
 }
 function tick(){if(!polling)status().catch(function(){});}
 setInterval(tick,3000);tick();

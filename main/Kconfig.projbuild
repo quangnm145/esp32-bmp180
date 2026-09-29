@@ -100,6 +100,17 @@ menu "IoT Device Configuration"
         help
             Used only when no Wi-Fi is saved in NVS. Put real values in sdkconfig.secrets.
 
+    config APP_TS_HISTORY_CHANNEL_ID
+        int "ThingSpeak history channel ID"
+        range 0 2147483647
+        default 0
+
+    config APP_TS_HISTORY_READ_KEY
+        string "ThingSpeak history read API key"
+        default ""
+        help
+            Set in sdkconfig.secrets. Used only by the ESP32 history downloader.
+
     config APP_DEFAULT_WIFI_PASSWORD
         string "Default Wi-Fi password"
         default ""
