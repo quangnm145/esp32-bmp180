@@ -1,3 +1,4 @@
-idf_component_register(SRCS "esp32_bmp180_main.c"
+idf_component_register(SRCS "main.c"
                        INCLUDE_DIRS "."
-                       REQUIRES bmp180)
+                       REQUIRES bmp180 dht11 thingspeak
+                                esp_wifi esp_event esp_netif nvs_flash)

@@ -1,4 +1,4 @@
-# ESP32 BMP180
+﻿# ESP32 BMP180
 
 Project ESP-IDF đọc cảm biến nhiệt độ và áp suất BMP180 qua giao tiếp I2C. Chương trình hiển thị nhiệt độ, áp suất và độ cao ước tính trên serial monitor theo chu kỳ cấu hình.
 
@@ -35,7 +35,7 @@ Trong menu **BMP180 Configuration** có thể thay đổi:
 - `I2C SDA GPIO`: chân SDA, mặc định `25`
 - `I2C SCL GPIO`: chân SCL, mặc định `26`
 - `Sea-level reference pressure`: áp suất tham chiếu để tính độ cao, mặc định `101325 Pa`
-- `Measurement interval`: chu kỳ đọc cảm biến, mặc định `2000 ms`
+- `Measurement interval`: chu kỳ đọc cảm biến, mặc định `5000 ms`
 
 Flash size được đặt mặc định là 4 MB trong `sdkconfig.defaults`. Có thể kiểm tra tại:
 
@@ -78,6 +78,8 @@ esp32-bmp180/
 |-- CMakeLists.txt
 |-- sdkconfig.defaults
 |-- lib/
+|   |-- dht11/
+|   |-- thingspeak/
 |   `-- bmp180/
 |       |-- CMakeLists.txt
 |       |-- bmp180.c
@@ -85,7 +87,7 @@ esp32-bmp180/
 |-- main/
 |   |-- CMakeLists.txt
 |   |-- Kconfig.projbuild
-|   `-- esp32_bmp180_main.c
+|   `-- main.c
 `-- README.md
 ```
 
@@ -114,3 +116,13 @@ GPIO 25 và 26 là cấu hình mặc định cho ESP32 classic. ESP32-C3 không 
 ### Giá trị độ cao chưa chính xác
 
 Độ cao được suy ra từ áp suất tham chiếu. Hãy cập nhật `Sea-level reference pressure` theo áp suất mực nước biển tại vị trí và thời điểm đo để có kết quả tốt hơn.
+
+## ThingSpeak và cấu trúc thư viện
+
+Ứng dụng đọc BMP180/DHT11 và gửi HTTPS lên ThingSpeak. Task chờ 30 giây sau mỗi lần gửi; log cảm biến khoảng 5 giây/lần là chu kỳ đọc riêng.
+
+- [Luồng ứng dụng và các hàm main](main/README.md)
+- [Danh sách thư viện](lib/README.md)
+- [API BMP180](lib/bmp180/README.md)
+- [API DHT11](lib/dht11/README.md)
+- [API ThingSpeak và cấu hình Wi-Fi](lib/thingspeak/README.md)

@@ -24,8 +24,25 @@ menu "BMP180 Configuration"
     config BMP180_UPDATE_INTERVAL_MS
         int "Measurement interval (ms)"
         range 100 60000
-        default 2000
+        default 5000
         help
             Delay between consecutive sensor readings.
 
+endmenu
+
+menu "ThingSpeak Configuration"
+    config THINGSPEAK_WIFI_SSID
+        string "Wi-Fi SSID"
+        default ""
+
+    config THINGSPEAK_WIFI_PASSWORD
+        string "Wi-Fi password"
+        default ""
+
+    config DHT11_GPIO
+        int "DHT11 data GPIO"
+        range 0 33
+        default 27
+        help
+            Use an output-capable GPIO different from the BMP180 I2C pins.
 endmenu
