@@ -1,46 +1,25 @@
-﻿# ThingSpeak trong app_main
+# ThingSpeak worker
 
-`app_main` đọc nhiệt độ BMP180 (field1, °C), áp suất BMP180 (field2, hPa),
-và độ ẩm DHT11 (field3, %). Chỉ bộ số đo đọc thành công mới được đưa vào queue.
-Task ThingSpeak tự khởi chạy sau khi Wi-Fi nhận IP. Sau mỗi lần gửi HTTP,
-task chờ 30 giây trước lần gửi tiếp theo (cộng thời gian xử lý HTTP).
-Lần đầu gửi ngay khi có mẫu hợp lệ. Log đọc cảm biến mỗi 5 giây không phải log gửi HTTP.
-Wi-Fi tự kết nối lại khi mất mạng.
+```c
+esp_err_t thingspeak_worker_start(thingspeak_network_ready_fn network_ready,
+                                  TaskHandle_t *out_task);
+void thingspeak_get_status(thingspeak_status_t *out);
+```
 
-## Cấu hình và chạy
+Worker được đánh thức bằng task notify:
 
-1. Chạy `idf.py menuconfig`, mở **ThingSpeak Configuration**.
-2. Nhập **Wi-Fi SSID**, **Wi-Fi password** và **DHT11 data GPIO** (mặc định 32).
-3. Nối DHT11 DATA vào GPIO đã chọn, VCC vào 3V3, GND vào GND; dùng điện trở
-   kéo lên DATA nếu module chưa có. BMP180 giữ SDA 25, SCL 26 theo cấu hình.
-4. Bật field1, field2, field3 trong Channel Settings của ThingSpeak.
-5. Chạy `idf.py build` rồi `idf.py -p COMx flash monitor`.
+- `THINGSPEAK_NOTIFY_TICK`: từ ISR `app_tick` mỗi 1 s
+- `THINGSPEAK_NOTIFY_DATA`: `sensor_service` vừa đẩy object mới vào `data_pool`
 
-Write API Key đã đặt trong `thingspeak.c`; không cần Read API Key để gửi.
-Nếu SSID để trống, chương trình vẫn đọc cảm biến và nhắc cấu hình Wi-Fi.
-Chu kỳ đọc cảm biến mặc định là 5 giây, được giới hạn tối thiểu 2 giây để phù hợp DHT11.
+Mỗi lần thức, worker chỉ gửi khi ThingSpeak được bật, có API key, `network_ready()`
+trả về true, pool có dữ liệu và đã qua `THINGSPEAK_MIN_INTERVAL_MS` (15 s) từ lần gửi trước.
 
-`send_data_to_thingspeak()` nhận queue một phần tử chứa `thingspeak_sample_t`.
-Task chỉ xác nhận thành công khi HTTP 200 và body là entry ID dương.
-Lỗi mạng không xóa task; lần gửi sau lấy mẫu mới nhất trong queue.
+| Điều kiện | Cách gửi |
+|-----------|----------|
+| Có Channel ID và đã đồng bộ SNTP | `POST /channels/<id>/bulk_update.json` toàn bộ pool, mỗi object có `created_at` UTC. Thành công: HTTP 202 `{"success":true}` |
+| Còn lại | `GET /update` object mới nhất, bỏ các object cũ hơn |
 
-Tài liệu: https://www.mathworks.com/help/thingspeak/writedata.html
+Object chỉ bị xoá khỏi pool sau khi gửi thành công; lỗi mạng thì giữ lại để lần sau gửi tiếp.
 
-## Các hàm và kiểu dữ liệu
-
-- `send_data_to_thingspeak(void *pvParameters)`: task FreeRTOS chạy liên tục.
-  Tham số là `QueueHandle_t` của queue một phần tử, mỗi phần tử có kiểu
-  `thingspeak_sample_t`. Tạo task đúng một lần sau khi Wi-Fi nhận IP;
-  ứng dụng giữ queue tồn tại và cập nhật bằng `xQueueOverwrite()`.
-  Task lấy mẫu mới nhất, bỏ số đo không hợp lệ, tạo URL GET, kiểm tra phản hồi
-  rồi chờ `THINGSPEAK_SEND_INTERVAL_MS` (30000 ms), kể cả khi gửi lỗi.
-  Nếu queue NULL hoặc không tạo được HTTP client, task ghi log rồi tự xóa.
-- `on_http_event(esp_http_client_event_t *event)`: hàm nội bộ (`static`),
-  ghép các đoạn body HTTP vào bộ đệm để đọc entry ID và phát hiện tràn bộ đệm.
-  Ứng dụng không gọi trực tiếp.
-- `thingspeak_sample_t`: gồm `temperature_c`, `pressure_hpa`,
-  `humidity_percent`, lần lượt tương ứng field1, field2, field3.
-
-Component phụ thuộc FreeRTOS, `esp_http_client` và `mbedtls`.
-`main/CMakeLists.txt` chỉ cần khai báo phụ thuộc `thingspeak` và include
-`thingspeak.h`. Bật certificate bundle để xác thực HTTPS.
+Anh xạ field nằm trong bảng `FIELD_MAP` (`thingspeak.c`):
+field1 nhiệt độ BMP180, field2 áp suất hPa, field3 độ ẩm, field4 nhiệt độ DHT11.

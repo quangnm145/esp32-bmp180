@@ -283,7 +283,12 @@ esp_err_t bmp180_read_altitude(uint32_t reference_pressure, float* altitude)
 
 esp_err_t bmp180_init(int pin_sda, int pin_scl)
 {
+    static bool driver_installed;
     esp_err_t err;
+
+    if (driver_installed) {
+        goto probe;
+    }
 
     i2c_config_t conf;
     conf.mode = I2C_MODE_MASTER;
@@ -304,8 +309,10 @@ esp_err_t bmp180_init(int pin_sda, int pin_scl)
         ESP_LOGE(TAG, "I2C driver installation failed with error = %d", err);
         return ESP_ERR_BMP180_NOT_DETECTED;
     }
+    driver_installed = true;
     ESP_LOGI(TAG, "I2C master driver has been installed.");
 
+probe:;
     uint8_t reg = 0x00;
     err = bmp180_master_write_slave(I2C_NUM_0, &reg, 1);
 

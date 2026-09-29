@@ -1,20 +1,21 @@
 # Ứng dụng chính
 
-`main.c` điều phối ba component trong `lib`: `bmp180`, `dht11`, `thingspeak`.
+`app_main()` khởi tạo theo thứ tự:
 
-| Hàm | Chức năng |
-| --- | --- |
-| `app_main()` | Khởi tạo cảm biến, queue một phần tử và Wi-Fi. Đọc cảm biến khoảng mỗi 5 giây theo cấu hình mặc định; tạo task ThingSpeak một lần khi có IP; đưa bộ số đo hợp lệ mới nhất vào queue. |
-| `wifi_init()` | Khởi tạo NVS, giao diện mạng, event loop và Wi-Fi station; lấy SSID/password từ menuconfig rồi bắt đầu kết nối. |
-| `wifi_event_handler()` | Bắt sự kiện bắt đầu Wi-Fi, mất kết nối và nhận IP; cập nhật bit trạng thái mạng, yêu cầu kết nối lại khi mất mạng. |
+1. `app_config_init()` – NVS và cấu hình đã lưu
+2. `status_led_init()` – LED ở trạng thái mất kết nối
+3. `data_pool_init()`
+4. `wifi_manager_start()` – AP `IOT_Device` + kết nối Wi-Fi đã lưu; callback đổi LED
+5. `web_server_start()` – trang cấu hình, tài khoản từ Kconfig
+6. `thingspeak_worker_start()` – worker + SNTP
+7. `sensor_service_start()` – task cảm biến, báo worker khi có object mới
+8. `app_tick_subscribe()` cho hai task rồi `app_tick_start(1000)`
 
-Chạy `idf.py menuconfig` → **ThingSpeak Configuration** để nhập Wi-Fi và
-chân DHT11. Mục **BMP180 Configuration** cấu hình chân I2C và chu kỳ đo.
-Nếu để SSID trống, ứng dụng chỉ đọc cảm biến.
+Sau đó task chính in nhịp tim mỗi 60 s gồm IP Wi-Fi, IP AP và số object trong pool.
 
-Chu kỳ đo và chu kỳ gửi độc lập: log cảm biến khoảng 5 giây/lần;
-ThingSpeak chờ 30 giây sau mỗi lần gửi HTTP. Không tạo thêm task gửi trong
-vòng lặp vì mỗi task sẽ có bộ đếm thời gian riêng.
+Cấu hình build trong `idf.py menuconfig`:
 
-Xem chi tiết API tại [BMP180](../lib/bmp180/README.md),
-[DHT11](../lib/dht11/README.md), [ThingSpeak](../lib/thingspeak/README.md).
+- **BMP180 Configuration**: chân SDA/SCL, áp suất mực nước biển
+- **ThingSpeak Configuration**: chân DHT11
+- **IoT Device Configuration**: tên/IP AP, tài khoản web, GPIO LED, chu kỳ mặc định,
+  ThingSpeak/Wi-Fi mặc định (điền trong `sdkconfig.secrets`), chế độ fake data

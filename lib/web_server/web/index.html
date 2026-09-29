@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>IOT Device</title>
+<style>
+:root{--bg:#f3f5f9;--card:#fff;--fg:#1c2330;--mut:#667085;--line:#e3e7ee;--acc:#2563eb;--acc-fg:#fff;--ok:#16a34a;--warn:#d97706;--err:#dc2626;--soft:#eef2ff}
+@media (prefers-color-scheme:dark){:root{--bg:#0f141b;--card:#18202b;--fg:#e6ebf2;--mut:#98a2b3;--line:#2a3441;--acc:#4f8cff;--acc-fg:#fff;--ok:#22c55e;--warn:#f59e0b;--err:#f87171;--soft:#1e2a3d}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.wrap{max-width:760px;margin:0 auto;padding:0 16px}
+.top{display:flex;align-items:center;justify-content:space-between;padding:12px 0 6px}
+.top h1{font-size:18px;margin:0}
+.pill{font-size:12px;padding:3px 10px;border-radius:99px;background:var(--soft);color:var(--mut);white-space:nowrap}
+.pill.ok{color:var(--ok)}.pill.err{color:var(--err)}.pill.warn{color:var(--warn)}
+nav{display:flex;gap:4px;overflow-x:auto}
+nav button{flex:1 0 auto;background:none;border:0;border-bottom:3px solid transparent;color:var(--mut);padding:10px 12px;font:inherit;font-weight:600;cursor:pointer}
+nav button.on{color:var(--acc);border-color:var(--acc)}
+main{padding:16px 0 40px}
+section{display:none}section.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
+.card h2{font-size:15px;margin:0 0 12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.m{background:var(--bg);border-radius:10px;padding:10px 12px}
+.m b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+.m span{font-size:12px;color:var(--mut)}
+dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0}
+dt{color:var(--mut)}dd{margin:0;word-break:break-all;font-variant-numeric:tabular-nums}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:9px;padding:9px 16px;font:inherit;font-weight:600;cursor:pointer}
+.btn.p{background:var(--acc);border-color:var(--acc);color:var(--acc-fg)}
+.btn.d{color:var(--err);border-color:var(--err)}
+.btn:disabled{opacity:.55;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+label{display:block;font-size:13px;color:var(--mut);margin:10px 0 4px}
+input[type=text],input[type=password],input[type=number]{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--fg);font:inherit}
+input:focus{outline:2px solid var(--acc);outline-offset:-1px}
+.note{font-size:13px;color:var(--mut);margin:8px 0 0}
+.msg{margin-top:10px;font-size:14px;padding:9px 12px;border-radius:9px;display:none}
+.msg.ok,.msg.err,.msg.info{display:block}
+.msg.ok{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok)}
+.msg.err{background:color-mix(in srgb,var(--err) 14%,transparent);color:var(--err)}
+.msg.info{background:var(--soft);color:var(--fg)}
+ul.nets{list-style:none;margin:12px 0 0;padding:0}
+ul.nets>li{border-top:1px solid var(--line)}
+.net{display:flex;align-items:center;gap:10px;padding:11px 4px;cursor:pointer}
+.net .n{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.net small{color:var(--mut)}
+.bars{display:inline-flex;align-items:flex-end;gap:2px;height:14px}
+.bars i{width:4px;background:var(--line);border-radius:1px}
+.bars i.f{background:var(--acc)}
+.form{padding:4px 4px 14px}
+.sw{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.tg{position:relative;width:46px;height:26px;flex:none}
+.tg input{opacity:0;width:0;height:0}
+.tg span{position:absolute;inset:0;background:var(--line);border-radius:99px;cursor:pointer;transition:.2s}
+.tg span:before{content:"";position:absolute;width:20px;height:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+.tg input:checked+span{background:var(--acc)}
+.tg input:checked+span:before{transform:translateX(20px)}
+.spin{width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:r .8s linear infinite;display:inline-block}
+@keyframes r{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+<div class="top"><h1>IOT Device</h1><span id="hdr" class="pill">…</span></div>
+<nav id="tabs">
+<button data-t="st" class="on">Trạng thái</button>
+<button data-t="wf">Wi-Fi</button>
+<button data-t="ts">ThingSpeak</button>
+<button data-t="sy">Hệ thống</button>
+</nav>
+</div></header>
+<main class="wrap">
+
+<section id="st" class="on">
+<div class="card"><h2>Cảm biến</h2>
+<div class="grid">
+<div class="m"><span>Nhiệt độ (BMP180)</span><b id="s_bt">–</b></div>
+<div class="m"><span>Áp suất</span><b id="s_p">–</b></div>
+<div class="m"><span>Độ cao</span><b id="s_a">–</b></div>
+<div class="m"><span>Độ ẩm (DHT11)</span><b id="s_h">–</b></div>
+<div class="m"><span>Nhiệt độ (DHT11)</span><b id="s_dt">–</b></div>
+</div>
+<p class="note" id="s_age"></p>
+</div>
+<div class="card"><h2>Wi-Fi</h2><dl>
+<dt>Trạng thái</dt><dd id="w_st">–</dd>
+<dt>Mạng</dt><dd id="w_ss">–</dd>
+<dt>IP (mạng nhà)</dt><dd id="w_ip">–</dd>
+<dt>Tín hiệu</dt><dd id="w_rs">–</dd>
+<dt>Wi-Fi cấu hình</dt><dd id="w_ap">–</dd>
+</dl></div>
+<div class="card"><h2>Bộ đệm &amp; ThingSpeak</h2><dl>
+<dt>Trong bộ đệm</dt><dd id="p_c">–</dd>
+<dt>Đã gửi / bị bỏ</dt><dd id="p_sd">–</dd>
+<dt>Gửi thành công</dt><dd id="t_ls">–</dd>
+<dt>HTTP gần nhất</dt><dd id="t_h">–</dd>
+<dt>Yêu cầu / lỗi</dt><dd id="t_rf">–</dd>
+<dt>Lỗi gần nhất</dt><dd id="t_e">–</dd>
+<dt>Đồng bộ giờ</dt><dd id="t_ti">–</dd>
+</dl></div>
+<div class="card"><h2>Thiết bị</h2><dl>
+<dt>Thời gian chạy</dt><dd id="d_up">–</dd>
+<dt>RAM trống</dt><dd id="d_hp">–</dd>
+</dl></div>
+</section>
+
+<section id="wf">
+<div class="card"><h2>Kết nối Wi-Fi</h2>
+<div class="row"><button class="btn p" id="scan">Quét mạng</button><button class="btn" id="manual">Nhập SSID thủ công</button></div>
+<p class="note">Khi thiết bị chuyển kênh để kết nối, điện thoại có thể bị ngắt khỏi mạng IOT_Device trong giây lát — hãy kết nối lại nếu cần.</p>
+<div id="w_msg" class="msg"></div>
+<ul class="nets" id="nets"></ul>
+</div>
+</section>
+
+<section id="ts">
+<div class="card"><h2>ThingSpeak</h2>
+<form id="tsf">
+<div class="sw"><div><b>Gửi dữ liệu lên ThingSpeak</b></div><label class="tg"><input type="checkbox" id="t_en"><span></span></label></div>
+<label for="t_ch">Channel ID</label><input type="number" id="t_ch" min="0" inputmode="numeric" placeholder="vd 1234567">
+<label for="t_key">Write API Key</label><input type="text" id="t_key" maxlength="16" autocomplete="off" spellcheck="false" autocapitalize="characters">
+<label for="t_per">Chu kỳ lấy mẫu/gửi (giây)</label><input type="number" id="t_per" inputmode="numeric">
+<p class="note" id="t_hint"></p>
+<p class="note">Tài khoản ThingSpeak miễn phí chỉ nhận 1 lần cập nhật mỗi 15 giây. Thiết bị gom các mẫu vào bộ đệm và gửi theo lô (bulk update, cần Channel ID) nên chu kỳ ngắn hơn vẫn không mất dữ liệu.</p>
+<div class="row" style="margin-top:14px"><button class="btn p" type="submit" id="t_save">Lưu</button></div>
+<div id="t_msg" class="msg"></div>
+</form>
+</div>
+</section>
+
+<section id="sy">
+<div class="card"><h2>Hệ thống</h2>
+<div class="row"><button class="btn" id="rb">Khởi động lại</button><button class="btn d" id="fr">Khôi phục cài đặt gốc</button></div>
+<p class="note">Khôi phục cài đặt gốc sẽ xoá Wi-Fi và cấu hình ThingSpeak đã lưu.</p>
+<div id="y_msg" class="msg"></div>
+</div>
+</section>
+</main>
+
+<script>
+(function(){
+"use strict";
+var $=function(id){return document.getElementById(id);};
+var ST={not_configured:"Chưa cấu hình",connecting:"Đang kết nối",connected:"Đã kết nối",disconnected:"Mất kết nối"};
+var tsLoaded=false,polling=false;
+
+function msg(id,cls,html){var e=$(id);e.className="msg"+(cls?" "+cls:"");e.innerHTML=html||"";}
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c];});}
+function num(v,d,u){return v===null||v===undefined?"–":Number(v).toFixed(d)+u;}
+function dur(s){if(s<0)return"–";var d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60),x=s%60;
+  return(d?d+" ngày ":"")+(d||h?h+" giờ ":"")+(d||h||m?m+" phút ":"")+(d?"":x+" giây");}
+function reason(c){if(c===2||c===15||c===202||c===204)return"Sai mật khẩu";if(c===201)return"Không tìm thấy mạng";return"Lỗi "+c;}
+function bars(r){var n=r>=-55?4:r>=-67?3:r>=-78?2:1,h="";for(var i=1;i<=4;i++)h+='<i class="'+(i<=n?"f":"")+'" style="height:'+(i*25)+'%"></i>';return'<span class="bars" title="'+r+' dBm">'+h+"</span>";}
+var LOCK='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-label="Có mật khẩu"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+
+function api(path,body){
+  var o={method:body===undefined?"GET":"POST",credentials:"same-origin",cache:"no-store"};
+  if(body!==undefined){o.headers={"Content-Type":"application/json"};o.body=JSON.stringify(body);}
+  return fetch(path,o).then(function(r){return r.json().catch(function(){return{};}).then(function(j){
+    if(!r.ok)throw new Error(j.error||("HTTP "+r.status));return j;});});
+}
+
+/* Tabs */
+var tabs=document.querySelectorAll("#tabs button");
+function show(t){
+  for(var i=0;i<tabs.length;i++)tabs[i].classList.toggle("on",tabs[i].dataset.t===t);
+  var s=document.querySelectorAll("section");for(i=0;i<s.length;i++)s[i].classList.toggle("on",s[i].id===t);
+  if(t==="ts"&&!tsLoaded)loadTs();
+  try{localStorage.setItem("tab",t);}catch(e){}
+}
+for(var i=0;i<tabs.length;i++)tabs[i].onclick=function(){show(this.dataset.t);};
+
+/* Trang thai */
+function status(){
+  return api("/api/status").then(function(j){
+    var w=j.wifi,s=j.sensor,p=j.pool,t=j.thingspeak,h=$("hdr");
+    h.textContent=ST[w.state]||w.state;
+    h.className="pill "+(w.state==="connected"?"ok":w.state==="connecting"?"warn":"err");
+    $("w_st").textContent=(ST[w.state]||w.state)+
+      (w.state!=="connected"&&w.last_disconnect_reason?" — "+reason(w.last_disconnect_reason):"");
+    $("w_ss").textContent=w.ssid||"–";
+    $("w_ip").textContent=w.sta_ip&&w.state==="connected"?w.sta_ip:"–";
+    $("w_rs").textContent=w.state==="connected"?w.rssi+" dBm":"–";
+    $("w_ap").textContent=w.ap_ssid+" ("+w.ap_ip+")";
+    $("s_bt").textContent=num(s.bmp_temperature_c,1," °C");
+    $("s_p").textContent=num(s.pressure_hpa,1," hPa");
+    $("s_a").textContent=num(s.altitude_m,0," m");
+    $("s_h").textContent=num(s.humidity_percent,0," %");
+    $("s_dt").textContent=num(s.dht_temperature_c,0," °C");
+    $("s_age").textContent=s.age_s<0?"Chưa có mẫu dữ liệu.":"Mẫu #"+s.seq+", cách đây "+dur(s.age_s)+
+      (!s.bmp180_valid?" · BMP180 lỗi":"")+(!s.dht11_valid?" · DHT11 lỗi":"");
+    $("p_c").textContent=p.count+" / "+p.capacity;
+    $("p_sd").textContent=p.sent+" / "+p.dropped;
+    $("t_ls").textContent=t.last_success_s<0?"Chưa có":"cách đây "+dur(t.last_success_s)+" (lô "+t.last_batch_size+" mẫu)";
+    $("t_h").textContent=t.last_http_status||"–";
+    $("t_rf").textContent=t.requests+" / "+t.failures;
+    $("t_e").textContent=t.last_error||"–";
+    $("t_ti").textContent=t.time_synced?"Đã đồng bộ":"Chưa";
+    $("d_up").textContent=dur(j.uptime_s);
+    $("d_hp").textContent=Math.round(j.free_heap/1024)+" KB";
+    return j;
+  });
+}
+function tick(){if(!polling)status().catch(function(){});}
+setInterval(tick,3000);tick();
+
+/* Wi-Fi */
+var nets=$("nets"),openLi=null;
+function formHtml(secure,manual){
+  return'<div class="form">'+(manual?'<label>Tên mạng (SSID)</label><input type="text" class="f_ss" maxlength="32" autocomplete="off">':"")+
+    (secure||manual?'<label>Mật khẩu'+(manual?" (để trống nếu mạng mở)":"")+'</label><input type="password" class="f_pw" maxlength="64" autocomplete="current-password">'+
+    '<label style="display:flex;gap:6px;align-items:center;margin-top:6px"><input type="checkbox" class="f_sh"> Hiện mật khẩu</label>':'<p class="note">Mạng mở, không cần mật khẩu.</p>')+
+    '<div class="row" style="margin-top:12px"><button class="btn p f_go">Kết nối</button><button class="btn f_x">Huỷ</button></div></div>';
+}
+function closeForm(){if(openLi){var f=openLi.querySelector(".form");if(f)f.remove();openLi=null;}}
+function openForm(li,ssid,secure,manual){
+  var same=openLi===li;closeForm();if(same)return;
+  li.insertAdjacentHTML("beforeend",formHtml(secure,manual));openLi=li;
+  var pw=li.querySelector(".f_pw"),ss=li.querySelector(".f_ss"),sh=li.querySelector(".f_sh");
+  if(sh)sh.onchange=function(){pw.type=sh.checked?"text":"password";};
+  (ss||pw||{focus:function(){}}).focus();
+  li.querySelector(".f_x").onclick=function(e){e.stopPropagation();closeForm();if(manual)li.remove();};
+  li.querySelector(".f_go").onclick=function(e){
+    e.stopPropagation();
+    var name=ss?ss.value.trim():ssid,pass=pw?pw.value:"";
+    if(!name){msg("w_msg","err","Hãy nhập tên mạng.");return;}
+    if(pass.length&&(pass.length<8||pass.length>64)){msg("w_msg","err","Mật khẩu phải từ 8 đến 64 ký tự (hoặc để trống với mạng mở).");return;}
+    connect(name,pass,this);
+  };
+  var inputs=li.querySelectorAll("input");
+  for(var i=0;i<inputs.length;i++)inputs[i].onclick=function(e){e.stopPropagation();};
+}
+function connect(ssid,pass,btn){
+  btn.disabled=true;
+  msg("w_msg","info",'<span class="spin"></span> Đang kết nối tới <b>'+esc(ssid)+"</b>…");
+  api("/api/wifi",{ssid:ssid,password:pass}).then(function(){
+    closeForm();polling=true;
+    var t0=Date.now(),seen=false;
+    (function poll(){
+      setTimeout(function(){
+        status().then(function(j){
+          var w=j.wifi;
+          if(w.state==="connecting")seen=true;
+          if(w.state==="connected"&&w.ssid===ssid&&w.sta_ip){
+            polling=false;msg("w_msg","ok","Đã kết nối <b>"+esc(ssid)+"</b>. IP mới: <b>"+esc(w.sta_ip)+'</b> — có thể mở <a href="http://'+esc(w.sta_ip)+'/">http://'+esc(w.sta_ip)+"</a> khi điện thoại ở cùng mạng.");return;
+          }
+          if(Date.now()-t0>30000){polling=false;
+            msg("w_msg","err","Kết nối thất bại: "+(w.last_disconnect_reason?reason(w.last_disconnect_reason):"hết thời gian chờ")+".");return;}
+          if(seen&&w.state==="disconnected"&&w.last_disconnect_reason&&Date.now()-t0>8000){polling=false;
+            msg("w_msg","err","Kết nối thất bại: "+reason(w.last_disconnect_reason)+".");return;}
+          poll();
+        }).catch(function(){
+          if(Date.now()-t0>30000){polling=false;msg("w_msg","err","Mất liên lạc với thiết bị. Hãy kết nối lại mạng IOT_Device rồi xem tab Trạng thái.");}
+          else poll();
+        });
+      },1500);
+    })();
+  }).catch(function(e){btn.disabled=false;msg("w_msg","err",esc(e.message));});
+}
+$("scan").onclick=function(){
+  var b=this;b.disabled=true;b.innerHTML='<span class="spin"></span> Đang quét…';closeForm();
+  api("/api/scan").then(function(list){
+    nets.innerHTML="";
+    if(!list.length)msg("w_msg","info","Không tìm thấy mạng nào.");else msg("w_msg","","");
+    list.forEach(function(n){
+      var li=document.createElement("li");
+      li.innerHTML='<div class="net">'+bars(n.rssi)+'<span class="n">'+esc(n.ssid)+"</span><small>"+n.rssi+" dBm · k"+n.channel+"</small>"+(n.secure?LOCK:"")+"</div>";
+      li.firstChild.onclick=function(){openForm(li,n.ssid,n.secure,false);};
+      nets.appendChild(li);
+    });
+  }).catch(function(e){msg("w_msg","err","Quét thất bại: "+esc(e.message));})
+  .then(function(){b.disabled=false;b.textContent="Quét mạng";});
+};
+$("manual").onclick=function(){
+  var li=document.createElement("li");li.innerHTML='<div class="net"><span class="n"><b>Mạng ẩn / nhập thủ công</b></span></div>';
+  nets.insertBefore(li,nets.firstChild);openForm(li,"",true,true);
+};
+
+/* ThingSpeak */
+function loadTs(){
+  api("/api/thingspeak").then(function(c){
+    tsLoaded=true;
+    $("t_en").checked=c.enabled;$("t_ch").value=c.channel_id||"";$("t_key").value=c.write_api_key;
+    var p=$("t_per");p.value=c.period_s;p.min=c.min_period_s;p.max=c.max_period_s;
+    $("t_hint").textContent="Từ "+c.min_period_s+" đến "+c.max_period_s+" giây. Khoảng cách tối thiểu giữa hai lần gửi: "+c.min_send_interval_s+" giây.";
+  }).catch(function(e){msg("t_msg","err","Không tải được cấu hình: "+esc(e.message));});
+}
+$("tsf").onsubmit=function(e){
+  e.preventDefault();
+  var key=$("t_key").value.trim(),b=$("t_save");
+  if($("t_en").checked&&!key){msg("t_msg","err","Cần nhập Write API Key khi bật ThingSpeak.");return;}
+  if(key&&!/^[A-Za-z0-9]{1,16}$/.test(key)){msg("t_msg","err","Write API Key chỉ gồm chữ và số, tối đa 16 ký tự.");return;}
+  b.disabled=true;
+  api("/api/thingspeak",{enabled:$("t_en").checked,channel_id:Number($("t_ch").value||0),write_api_key:key,period_s:Number($("t_per").value)})
+  .then(function(){msg("t_msg","ok","Đã lưu cấu hình.");})
+  .catch(function(e){msg("t_msg","err","Lưu thất bại: "+esc(e.message));})
+  .then(function(){b.disabled=false;});
+};
+
+/* He thong */
+function restart(path,text){
+  api(path,{}).then(function(){msg("y_msg","info",text+" Trang sẽ tải lại sau khoảng 10 giây.");setTimeout(function(){location.reload();},10000);})
+  .catch(function(e){msg("y_msg","err",esc(e.message));});
+}
+$("rb").onclick=function(){if(confirm("Khởi động lại thiết bị?"))restart("/api/reboot","Đang khởi động lại…");};
+$("fr").onclick=function(){if(confirm("Xoá toàn bộ cấu hình (Wi-Fi, ThingSpeak) và khởi động lại?"))restart("/api/factory-reset","Đã khôi phục cài đặt gốc, đang khởi động lại…");};
+
+var saved=null;try{saved=localStorage.getItem("tab");}catch(e){}
+if(saved&&$(saved))show(saved);
+})();
+</script>
+</body>
+</html>

@@ -1,4 +1,4 @@
 idf_component_register(SRCS "main.c"
                        INCLUDE_DIRS "."
-                       REQUIRES bmp180 dht11 thingspeak
-                                esp_wifi esp_event esp_netif nvs_flash)
+                       REQUIRES app_config status_led data_pool wifi_manager web_server
+                                thingspeak sensor_service app_tick)
