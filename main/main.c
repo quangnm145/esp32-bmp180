@@ -95,7 +95,6 @@ void app_main(void)
         .bmp180_sda_gpio = CONFIG_BMP180_SDA_GPIO,
         .bmp180_scl_gpio = CONFIG_BMP180_SCL_GPIO,
         .dht11_gpio = CONFIG_DHT11_GPIO,
-        .sea_level_pressure_pa = CONFIG_BMP180_SEA_LEVEL_PRESSURE_PA,
         .consumer_task = ts_task,
         .consumer_notify_bits = THINGSPEAK_NOTIFY_DATA,
     };

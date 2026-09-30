@@ -2,7 +2,7 @@
 
 **English** | [Tiếng Việt](README.vi.md)
 
-ESP-IDF firmware for ESP32 that samples a BMP180 (temperature, pressure, altitude) and a DHT11
+ESP-IDF firmware for ESP32 that samples a BMP180 (temperature, pressure) and a DHT11
 (humidity, temperature), filters the signals, packs each period into one data object, queues it
 in a fixed-size pool and uploads it to ThingSpeak. Wi-Fi and ThingSpeak are configured from a
 web page served by the device itself.
@@ -335,7 +335,6 @@ Data object (`sensor_sample_t`, `lib/data_pool/data_pool.h`):
 | `valid` | bit mask | `SAMPLE_VALID_BMP180`, `SAMPLE_VALID_DHT11` |
 | `bmp_temperature_c` | °C | BMP180, filtered |
 | `pressure_hpa` | hPa | BMP180, filtered |
-| `altitude_m` | m | from filtered pressure and sea-level reference |
 | `humidity_percent` | %RH | DHT11, filtered |
 | `dht_temperature_c` | °C | DHT11, filtered |
 
@@ -543,7 +542,7 @@ must be alphanumeric because it is placed in the request URL.
 | `APP_DEFAULT_WIFI_SSID` / `_PASSWORD` | empty | Used only when NVS has no Wi-Fi |
 | `APP_SENSOR_FAKE_DATA` | on in `sdkconfig.defaults` | Synthetic data, no sensors |
 
-Other menus: **BMP180 Configuration** (SDA, SCL, sea-level pressure), **ThingSpeak Configuration**
+Other menus: **BMP180 Configuration** (SDA, SCL), **ThingSpeak Configuration**
 (DHT11 GPIO).
 
 Compile-time constants:

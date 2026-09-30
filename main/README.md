@@ -12,10 +12,12 @@
 8. `app_tick_subscribe()` cho hai task rồi `app_tick_start(1000)`
 
 Sau đó task chính in nhịp tim mỗi 60 s gồm IP Wi-Fi, IP AP và số object trong pool.
+Task cảm biến tạo mẫu ThingSpeak đầu sau khoảng 30 s khởi động, rồi tạo các
+mẫu tiếp theo theo chu kỳ cấu hình (mặc định 30 s) tính từ mẫu đầu.
 
 Cấu hình build trong `idf.py menuconfig`:
 
-- **BMP180 Configuration**: chân SDA/SCL, áp suất mực nước biển
+- **BMP180 Configuration**: chân SDA/SCL
 - **ThingSpeak Configuration**: chân DHT11
 - **IoT Device Configuration**: tên/IP AP, tài khoản web, GPIO LED, chu kỳ mặc định,
   ThingSpeak/Wi-Fi mặc định (điền trong `sdkconfig.secrets`), chế độ fake data

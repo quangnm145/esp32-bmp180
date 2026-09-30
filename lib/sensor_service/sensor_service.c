@@ -15,9 +15,16 @@
 static const char *TAG = "SENSOR";
 
 #define DHT11_READ_EVERY_TICKS  2   /* DHT11 can >= 2 s giua hai lan do */
+#define STARTUP_SAMPLE_TICKS    30  /* mau dau sau khoi dong, truoc chu ky dinh ky */
 #define BMP180_RETRY_TICKS      10
 #define STALE_TICKS             10  /* qua so tick nay khong doc duoc thi coi la hong */
 #define FILTER_ALPHA            0.3f
+
+/* Apply offsets once to filtered real samples, not to the BMP180 pressure algorithm.
+ * The humidity offset was adjusted using the newer 83.6% versus 77% reference. */
+#define BMP180_TEMP_OFFSET_C    (-0.90f)
+#define DHT11_TEMP_OFFSET_C     (-3.50f)
+#define DHT11_HUMIDITY_OFFSET   15.20f  /* percentage points of relative humidity */
 
 typedef struct {
     signal_filter_t temperature;
@@ -200,14 +207,20 @@ static bool pack_sample(uint32_t tick, sensor_sample_t *sample)
     if (is_fresh(s_bmp.last_ok_tick, tick) &&
         signal_filter_get(&s_bmp.temperature, &sample->bmp_temperature_c) &&
         signal_filter_get(&s_bmp.pressure_pa, &pressure_pa)) {
+#if !CONFIG_APP_SENSOR_FAKE_DATA
+        sample->bmp_temperature_c += BMP180_TEMP_OFFSET_C;
+#endif
         sample->pressure_hpa = pressure_pa / 100.0f;
-        sample->altitude_m = 44330.0f *
-            (1.0f - powf(pressure_pa / (float)s_config.sea_level_pressure_pa, 0.190295f));
         sample->valid |= SAMPLE_VALID_BMP180;
     }
     if (is_fresh(s_dht.last_ok_tick, tick) &&
         signal_filter_get(&s_dht.humidity, &sample->humidity_percent) &&
         signal_filter_get(&s_dht.temperature, &sample->dht_temperature_c)) {
+#if !CONFIG_APP_SENSOR_FAKE_DATA
+        sample->dht_temperature_c += DHT11_TEMP_OFFSET_C;
+        sample->humidity_percent = fminf(100.0f, fmaxf(0.0f,
+            sample->humidity_percent + DHT11_HUMIDITY_OFFSET));
+#endif
         sample->valid |= SAMPLE_VALID_DHT11;
     }
     return sample->valid != 0;
@@ -217,6 +230,7 @@ static void sensor_task(void *arg)
 {
     uint32_t tick = 0;
     uint32_t elapsed_s = 0;
+    bool initial_sample_pending = true;
 
     while (true) {
         uint32_t bits = 0;
@@ -232,16 +246,18 @@ static void sensor_task(void *arg)
 
         app_thingspeak_config_t ts;
         app_config_get_thingspeak(&ts);
-        if (++elapsed_s < ts.period_s) {
+        uint32_t interval_s = initial_sample_pending ? STARTUP_SAMPLE_TICKS : ts.period_s;
+        if (++elapsed_s < interval_s) {
             continue;
         }
-        elapsed_s = 0;
 
         sensor_sample_t sample;
         if (!pack_sample(tick, &sample)) {
             ESP_LOGW(TAG, "Khong co cam bien nao hop le, bo qua chu ky");
             continue;
         }
+        initial_sample_pending = false;
+        elapsed_s = 0;
         bool dropped = data_pool_push(&sample);
 
         portENTER_CRITICAL(&s_latest_lock);

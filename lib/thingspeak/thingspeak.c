@@ -25,7 +25,6 @@ typedef enum {
     SRC_PRESSURE,
     SRC_HUMIDITY,
     SRC_DHT_TEMPERATURE,
-    SRC_ALTITUDE,
 } field_source_t;
 
 /* Anh xa field ThingSpeak -> du lieu. Tam hardcode, sau nay doc tu cau hinh. */
@@ -37,7 +36,6 @@ static const struct {
     {"field2", SRC_PRESSURE},
     {"field3", SRC_HUMIDITY},
     {"field4", SRC_DHT_TEMPERATURE},
-    {"field5", SRC_ALTITUDE},
 };
 
 typedef struct {
@@ -66,9 +64,6 @@ static bool sample_value(const sensor_sample_t *sample, field_source_t source, f
     case SRC_DHT_TEMPERATURE:
         *out = sample->dht_temperature_c;
         return sample->valid & SAMPLE_VALID_DHT11;
-    case SRC_ALTITUDE:
-        *out = sample->altitude_m;
-        return sample->valid & SAMPLE_VALID_BMP180;
     }
     return false;
 }

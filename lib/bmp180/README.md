@@ -45,4 +45,5 @@ if (bmp180_read_temperature(&temperature) == ESP_OK &&
 ```
 
 Driver dùng trạng thái chung cho cảm biến; ứng dụng hiện đọc từ một task.
-Độ cao là giá trị ước tính, phụ thuộc áp suất tham chiếu đã cấu hình.
+Hàm độ cao vẫn có trong driver nhưng ứng dụng hiện không gọi. Nếu dùng hàm này
+ở ứng dụng khác, kết quả phụ thuộc áp suất tham chiếu truyền vào.

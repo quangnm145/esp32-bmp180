@@ -12,10 +12,12 @@ CONFIG_FREERTOS_HZ=1000
 # Web server: header Authorization/Cookie dai
 CONFIG_HTTPD_MAX_REQ_HDR_LEN=1024
 
+# Default ThingSpeak cycle after the startup sample
+CONFIG_APP_DEFAULT_PERIOD_S=30
+
 # BMP180 defaults
 CONFIG_BMP180_SDA_GPIO=25
 CONFIG_BMP180_SCL_GPIO=26
-CONFIG_BMP180_SEA_LEVEL_PRESSURE_PA=101325
 
 # Test mode without sensors (set to n when BMP180/DHT11 are wired)
 CONFIG_APP_SENSOR_FAKE_DATA=y

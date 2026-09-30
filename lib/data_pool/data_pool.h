@@ -19,7 +19,6 @@ typedef struct {
     uint8_t valid;              /* SAMPLE_VALID_* */
     float bmp_temperature_c;
     float pressure_hpa;
-    float altitude_m;
     float humidity_percent;
     float dht_temperature_c;
 } sensor_sample_t;

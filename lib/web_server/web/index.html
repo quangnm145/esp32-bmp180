@@ -83,7 +83,6 @@ ul.nets>li{border-top:1px solid var(--line)}
 <div class="grid">
 <div class="m"><span>Nhiệt độ (BMP180)</span><b id="s_bt">–</b></div>
 <div class="m"><span>Áp suất</span><b id="s_p">–</b></div>
-<div class="m"><span>Độ cao</span><b id="s_a">–</b></div>
 <div class="m"><span>Độ ẩm (DHT11)</span><b id="s_h">–</b></div>
 <div class="m"><span>Nhiệt độ (DHT11)</span><b id="s_dt">–</b></div>
 </div>
@@ -122,7 +121,7 @@ ul.nets>li{border-top:1px solid var(--line)}
 
 <section id="sn">
 <div class="card"><h2>Biểu đồ cảm biến</h2>
-<p class="note">Tải 50 mẫu gần nhất từ ThingSpeak khi mở trang, sau đó cập nhật số đo trực tiếp. Lịch sử được làm mới mỗi phút. Các mẫu cũ chưa lưu độ cao sẽ để trống trên biểu đồ.</p>
+<p class="note">Tải 50 mẫu gần nhất từ ThingSpeak khi mở trang, sau đó cập nhật số đo trực tiếp. Lịch sử được làm mới mỗi phút.</p>
 <div class="row"><button class="btn" id="history_reload">Tải lại lịch sử</button></div>
 <p class="note" id="history_status" role="status">Lịch sử sẽ được tải khi mở tab Cảm biến.</p>
 <p class="note" id="chart_status" role="status">Đang chờ dữ liệu cảm biến…</p>
@@ -136,6 +135,8 @@ ul.nets>li{border-top:1px solid var(--line)}
 <div class="sw"><div><b>Gửi dữ liệu lên ThingSpeak</b></div><label class="tg"><input type="checkbox" id="t_en"><span></span></label></div>
 <label for="t_ch">Channel ID</label><input type="number" id="t_ch" min="0" inputmode="numeric" placeholder="vd 1234567">
 <label for="t_key">Write API Key</label><input type="text" id="t_key" maxlength="16" autocomplete="off" spellcheck="false" autocapitalize="characters">
+<label for="t_read_key">Read API Key</label><input type="password" id="t_read_key" maxlength="16" autocomplete="off" spellcheck="false" autocapitalize="characters">
+<p class="note">Dùng để tải lịch sử cho tab Cảm biến. Để trống nếu channel công khai.</p>
 <label for="t_per">Chu kỳ lấy mẫu/gửi (giây)</label><input type="number" id="t_per" inputmode="numeric">
 <p class="note" id="t_hint"></p>
 <p class="note">Tài khoản ThingSpeak miễn phí chỉ nhận 1 lần cập nhật mỗi 15 giây. Thiết bị gom các mẫu vào bộ đệm và gửi theo lô (bulk update, cần Channel ID) nên chu kỳ ngắn hơn vẫn không mất dữ liệu.</p>
@@ -192,7 +193,6 @@ for(var i=0;i<tabs.length;i++)tabs[i].onclick=function(){show(this.dataset.t);};
 var chartFields=[
   {key:"bmp_temperature_c",name:"Nhiệt độ BMP180",unit:"°C",digits:2,valid:"bmp180_valid",color:"#e87932"},
   {key:"pressure_hpa",name:"Áp suất BMP180",unit:"hPa",digits:2,valid:"bmp180_valid",color:"#4f8cff"},
-  {key:"altitude_m",name:"Độ cao BMP180",unit:"m",digits:1,valid:"bmp180_valid",color:"#a78bfa"},
   {key:"humidity_percent",name:"Độ ẩm DHT11",unit:"%",digits:1,valid:"dht11_valid",color:"#14b8a6"},
   {key:"dht_temperature_c",name:"Nhiệt độ DHT11",unit:"°C",digits:1,valid:"dht11_valid",color:"#e85d91"}
 ];
@@ -235,7 +235,7 @@ function loadHistory(force){
         return {time:Date.parse(f.created_at),sensor:{
           bmp180_valid:true,dht11_valid:true,
           bmp_temperature_c:readField(f.field1),pressure_hpa:readField(f.field2),
-          humidity_percent:readField(f.field3),dht_temperature_c:readField(f.field4),altitude_m:readField(f.field5)
+          humidity_percent:readField(f.field3),dht_temperature_c:readField(f.field4)
         },breakBefore:false};
       }).sort(function(a,b){return a.time-b.time;}).slice(-50);
       historyLoadedAt=Date.now();rebuildHistory();
@@ -264,7 +264,8 @@ function recordSensor(j){
     "Mẫu #"+s.seq+" · Đo cách đây "+dur(s.age_s)+
     (!s.bmp180_valid?" · BMP180 lỗi":"")+(!s.dht11_valid?" · DHT11 lỗi":"");
   if(s.seq>0&&s.seq!==lastSeq&&s.age_s>=0){
-    localHistory.push({time:Date.now()-s.age_s*1000,sensor:s,breakBefore:lastSeq!==null&&s.seq!==lastSeq+1});
+    localHistory.push({time:Date.now()-s.age_s*1000,sensor:s,
+      breakBefore:lastSeq!==null&&s.seq!==lastSeq+1});
     if(localHistory.length>120)localHistory.shift();
     lastSeq=s.seq;
     rebuildHistory();
@@ -302,7 +303,8 @@ function drawCharts(){
     ctx.beginPath();var connected=false;
     points.forEach(function(p){
       var v=chartValue(p.sensor,f);if(v===null){connected=false;return;}
-      if(connected&&!p.breakBefore)ctx.lineTo(x(p),y(v));else ctx.moveTo(x(p),y(v));connected=true;
+      if(connected&&!p.breakBefore)ctx.lineTo(x(p),y(v));
+      else ctx.moveTo(x(p),y(v));connected=true;
     });ctx.stroke();
     points.forEach(function(p){var v=chartValue(p.sensor,f);if(v!==null){ctx.beginPath();ctx.arc(x(p),y(v),2.5,0,Math.PI*2);ctx.fill();}});
     canvas.setAttribute("aria-label",f.name+": "+values.length+" số đo, mới nhất "+$("value_"+f.key).textContent);
@@ -327,7 +329,6 @@ function status(){
     $("w_ap").textContent=w.ap_ssid+" ("+w.ap_ip+")";
     $("s_bt").textContent=num(s.bmp_temperature_c,1," °C");
     $("s_p").textContent=num(s.pressure_hpa,1," hPa");
-    $("s_a").textContent=num(s.altitude_m,0," m");
     $("s_h").textContent=num(s.humidity_percent,0," %");
     $("s_dt").textContent=num(s.dht_temperature_c,0," °C");
     $("s_age").textContent=s.age_s<0?"Chưa có mẫu dữ liệu.":"Mẫu #"+s.seq+", cách đây "+dur(s.age_s)+
@@ -429,18 +430,21 @@ function loadTs(){
   api("/api/thingspeak").then(function(c){
     tsLoaded=true;
     $("t_en").checked=c.enabled;$("t_ch").value=c.channel_id||"";$("t_key").value=c.write_api_key;
+    $("t_read_key").value=c.read_api_key||"";
     var p=$("t_per");p.value=c.period_s;p.min=c.min_period_s;p.max=c.max_period_s;
     $("t_hint").textContent="Từ "+c.min_period_s+" đến "+c.max_period_s+" giây. Khoảng cách tối thiểu giữa hai lần gửi: "+c.min_send_interval_s+" giây.";
   }).catch(function(e){msg("t_msg","err","Không tải được cấu hình: "+esc(e.message));});
 }
 $("tsf").onsubmit=function(e){
   e.preventDefault();
-  var key=$("t_key").value.trim(),b=$("t_save");
+  var key=$("t_key").value.trim(),readKey=$("t_read_key").value.trim(),b=$("t_save");
   if($("t_en").checked&&!key){msg("t_msg","err","Cần nhập Write API Key khi bật ThingSpeak.");return;}
   if(key&&!/^[A-Za-z0-9]{1,16}$/.test(key)){msg("t_msg","err","Write API Key chỉ gồm chữ và số, tối đa 16 ký tự.");return;}
+  if(readKey&&!/^[A-Za-z0-9]{1,16}$/.test(readKey)){msg("t_msg","err","Read API Key chỉ gồm chữ và số, tối đa 16 ký tự.");return;}
   b.disabled=true;
-  api("/api/thingspeak",{enabled:$("t_en").checked,channel_id:Number($("t_ch").value||0),write_api_key:key,period_s:Number($("t_per").value)})
-  .then(function(){msg("t_msg","ok","Đã lưu cấu hình.");})
+  api("/api/thingspeak",{enabled:$("t_en").checked,channel_id:Number($("t_ch").value||0),
+    write_api_key:key,read_api_key:readKey,period_s:Number($("t_per").value)})
+  .then(function(){historyLoadedAt=0;msg("t_msg","ok","Đã lưu cấu hình.");})
   .catch(function(e){msg("t_msg","err","Lưu thất bại: "+esc(e.message));})
   .then(function(){b.disabled=false;});
 };

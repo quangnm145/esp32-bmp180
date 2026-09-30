@@ -14,13 +14,6 @@ menu "BMP180 Configuration"
         help
             GPIO connected to the BMP180 SCL pin.
 
-    config BMP180_SEA_LEVEL_PRESSURE_PA
-        int "Sea-level reference pressure (Pa)"
-        range 30000 120000
-        default 101325
-        help
-            Reference pressure used to calculate altitude.
-
 endmenu
 
 menu "ThingSpeak Configuration"
@@ -70,7 +63,7 @@ menu "IoT Device Configuration"
     config APP_DEFAULT_PERIOD_S
         int "Default sampling/upload period (s)"
         range 5 3600
-        default 20
+        default 30
         help
             Default period used until a value is saved from the web page.
 

@@ -22,6 +22,7 @@ typedef struct {
     uint32_t channel_id;                      /* 0: khong dung bulk update */
     char write_api_key[APP_TS_API_KEY_LEN + 1];
     uint32_t period_s;                        /* chu ky lay mau = chu ky gui */
+    char read_api_key[APP_TS_API_KEY_LEN + 1]; /* NVS; chi dung cho lich su */
 } app_thingspeak_config_t;
 
 /* Khoi tao NVS va nap cau hinh vao bo nho dem. Goi mot lan truoc cac module khac. */

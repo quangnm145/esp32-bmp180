@@ -191,11 +191,9 @@ static esp_err_t status_get_handler(httpd_req_t *req)
     if (bmp_ok) {
         cJSON_AddNumberToObject(j_sensor, "bmp_temperature_c", sample.bmp_temperature_c);
         cJSON_AddNumberToObject(j_sensor, "pressure_hpa", sample.pressure_hpa);
-        cJSON_AddNumberToObject(j_sensor, "altitude_m", sample.altitude_m);
     } else {
         cJSON_AddNullToObject(j_sensor, "bmp_temperature_c");
         cJSON_AddNullToObject(j_sensor, "pressure_hpa");
-        cJSON_AddNullToObject(j_sensor, "altitude_m");
     }
     if (dht_ok) {
         cJSON_AddNumberToObject(j_sensor, "humidity_percent", sample.humidity_percent);
@@ -347,11 +345,13 @@ static esp_err_t thingspeak_get_handler(httpd_req_t *req)
     app_thingspeak_config_t config;
     app_config_get_thingspeak(&config);
     config.write_api_key[sizeof(config.write_api_key) - 1] = '\0';
+    config.read_api_key[sizeof(config.read_api_key) - 1] = '\0';
 
     cJSON *root = cJSON_CreateObject();
     cJSON_AddBoolToObject(root, "enabled", config.enabled);
     cJSON_AddNumberToObject(root, "channel_id", config.channel_id);
     cJSON_AddStringToObject(root, "write_api_key", config.write_api_key);
+    cJSON_AddStringToObject(root, "read_api_key", config.read_api_key);
     cJSON_AddNumberToObject(root, "period_s", config.period_s);
     cJSON_AddNumberToObject(root, "min_period_s", APP_PERIOD_MIN_S);
     cJSON_AddNumberToObject(root, "max_period_s", APP_PERIOD_MAX_S);
@@ -393,6 +393,9 @@ static esp_err_t thingspeak_post_handler(httpd_req_t *req)
     /* Truong nao khong gui thi giu gia tri hien tai. */
     app_thingspeak_config_t config;
     app_config_get_thingspeak(&config);
+    uint32_t old_channel_id = config.channel_id;
+    char old_read_key[APP_TS_API_KEY_LEN + 1];
+    memcpy(old_read_key, config.read_api_key, sizeof(old_read_key));
     const char *error = NULL;
 
     const cJSON *item = cJSON_GetObjectItemCaseSensitive(root, "enabled");
@@ -419,6 +422,14 @@ static esp_err_t thingspeak_post_handler(httpd_req_t *req)
             error = "Write API Key toi da 16 ky tu";
         }
     }
+    item = cJSON_GetObjectItemCaseSensitive(root, "read_api_key");
+    if (error == NULL && item != NULL) {
+        if (cJSON_IsString(item) && strlen(item->valuestring) < sizeof(config.read_api_key)) {
+            strlcpy(config.read_api_key, item->valuestring, sizeof(config.read_api_key));
+        } else {
+            error = "Read API Key toi da 16 ky tu";
+        }
+    }
     item = cJSON_GetObjectItemCaseSensitive(root, "period_s");
     if (error == NULL && item != NULL) {
         if (!json_to_u32(item, &config.period_s)) {
@@ -438,6 +449,10 @@ static esp_err_t thingspeak_post_handler(httpd_req_t *req)
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Luu cau hinh ThingSpeak that bai: %s", esp_err_to_name(err));
         return send_error(req, "500 Internal Server Error", esp_err_to_name(err));
+    }
+    if (old_channel_id != config.channel_id ||
+        strcmp(old_read_key, config.read_api_key) != 0) {
+        sensor_history_invalidate();
     }
     ESP_LOGI(TAG, "Da luu cau hinh ThingSpeak");
     return send_ok(req);

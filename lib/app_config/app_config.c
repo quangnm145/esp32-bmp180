@@ -19,14 +19,36 @@ static app_wifi_config_t s_wifi;
 static bool s_wifi_valid;
 static app_thingspeak_config_t s_thingspeak;
 
+/* NVS blob written before a Read API Key was editable from the web page. */
+typedef struct {
+    bool enabled;
+    uint32_t channel_id;
+    char write_api_key[APP_TS_API_KEY_LEN + 1];
+    uint32_t period_s;
+} thingspeak_config_v1_t;
+
+static bool key_valid(const char *key, size_t capacity)
+{
+    size_t length = strnlen(key, capacity);
+    if (length == capacity) return false;
+    for (size_t i = 0; i < length; i++) {
+        if (!isalnum((unsigned char)key[i])) return false;
+    }
+    return true;
+}
+
 static void thingspeak_defaults(app_thingspeak_config_t *config)
 {
     _Static_assert(sizeof(CONFIG_APP_DEFAULT_TS_WRITE_KEY) - 1 <= APP_TS_API_KEY_LEN,
                    "CONFIG_APP_DEFAULT_TS_WRITE_KEY qua dai");
+    _Static_assert(sizeof(CONFIG_APP_TS_HISTORY_READ_KEY) - 1 <= APP_TS_API_KEY_LEN,
+                   "CONFIG_APP_TS_HISTORY_READ_KEY qua dai");
     memset(config, 0, sizeof(*config));
     /* Mac dinh lay tu Kconfig (sdkconfig.secrets); gia tri luu trong NVS se ghi de. */
     strlcpy(config->write_api_key, CONFIG_APP_DEFAULT_TS_WRITE_KEY,
             sizeof(config->write_api_key));
+    strlcpy(config->read_api_key, CONFIG_APP_TS_HISTORY_READ_KEY,
+            sizeof(config->read_api_key));
     config->channel_id = (uint32_t)CONFIG_APP_DEFAULT_TS_CHANNEL_ID;
     config->period_s = CONFIG_APP_DEFAULT_PERIOD_S;
 #if CONFIG_APP_DEFAULT_TS_ENABLED
@@ -34,30 +56,23 @@ static void thingspeak_defaults(app_thingspeak_config_t *config)
 #else
     config->enabled = false;
 #endif
-    /* Key mac dinh co ky tu la thi bo, tranh ghep vao URL. */
-    for (size_t i = 0; config->write_api_key[i] != '\0'; i++) {
-        if (!isalnum((unsigned char)config->write_api_key[i])) {
-            memset(config->write_api_key, 0, sizeof(config->write_api_key));
-            config->enabled = false;
-            break;
-        }
+    if (!key_valid(config->write_api_key, sizeof(config->write_api_key))) {
+        memset(config->write_api_key, 0, sizeof(config->write_api_key));
+        config->enabled = false;
+    }
+    if (!key_valid(config->read_api_key, sizeof(config->read_api_key))) {
+        memset(config->read_api_key, 0, sizeof(config->read_api_key));
     }
 }
 
 static bool thingspeak_valid(const app_thingspeak_config_t *config)
 {
-    size_t key_length = strnlen(config->write_api_key, sizeof(config->write_api_key));
-    if (key_length == sizeof(config->write_api_key)) {
+    if (!key_valid(config->write_api_key, sizeof(config->write_api_key)) ||
+        !key_valid(config->read_api_key, sizeof(config->read_api_key))) {
         return false;
     }
-    if (config->enabled && key_length == 0) {
+    if (config->enabled && config->write_api_key[0] == '\0') {
         return false;
-    }
-    /* Key duoc ghep thang vao URL nen chi nhan chu va so. */
-    for (size_t i = 0; i < key_length; i++) {
-        if (!isalnum((unsigned char)config->write_api_key[i])) {
-            return false;
-        }
     }
     return config->period_s >= APP_PERIOD_MIN_S && config->period_s <= APP_PERIOD_MAX_S;
 }
@@ -80,11 +95,26 @@ static void load_from_nvs(void)
         s_wifi_valid = s_wifi.ssid[0] != '\0';
     }
 
-    app_thingspeak_config_t thingspeak;
-    size = sizeof(thingspeak);
-    if (nvs_get_blob(nvs, "thingspeak", &thingspeak, &size) == ESP_OK &&
-        size == sizeof(thingspeak) && thingspeak_valid(&thingspeak)) {
-        s_thingspeak = thingspeak;
+    size = 0;
+    if (nvs_get_blob(nvs, "thingspeak", NULL, &size) == ESP_OK) {
+        if (size == sizeof(app_thingspeak_config_t)) {
+            app_thingspeak_config_t thingspeak;
+            if (nvs_get_blob(nvs, "thingspeak", &thingspeak, &size) == ESP_OK &&
+                thingspeak_valid(&thingspeak)) {
+                s_thingspeak = thingspeak;
+            }
+        } else if (size == sizeof(thingspeak_config_v1_t)) {
+            thingspeak_config_v1_t old;
+            if (nvs_get_blob(nvs, "thingspeak", &old, &size) == ESP_OK) {
+                app_thingspeak_config_t migrated = s_thingspeak;
+                migrated.enabled = old.enabled;
+                migrated.channel_id = old.channel_id;
+                memcpy(migrated.write_api_key, old.write_api_key,
+                       sizeof(old.write_api_key));
+                migrated.period_s = old.period_s;
+                if (thingspeak_valid(&migrated)) s_thingspeak = migrated;
+            }
+        }
     }
     nvs_close(nvs);
 }

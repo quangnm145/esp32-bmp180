@@ -5,7 +5,7 @@
 
 ## Tab Cảm biến
 
-Hiển thị năm biểu đồ: nhiệt độ BMP180, áp suất, độ cao, độ ẩm DHT11
+Hiển thị bốn biểu đồ: nhiệt độ BMP180, áp suất, độ ẩm DHT11
 và nhiệt độ DHT11. Giá trị mới nhất và đơn vị nằm phía trên mỗi biểu đồ.
 Canvas không dùng CDN, hoạt động khi kết nối trực tiếp vào Wi-Fi của ESP32.
 
@@ -15,14 +15,14 @@ Khi mở tab, gọi `/api/sensors/history` để lấy 50 mẫu mới nhất t�
 Lịch sử được làm mới mỗi phút khi tab đang mở; có nút tải lại (vẫn dùng cache
 ESP32 nếu cache chưa hết hạn). Giữ thêm tối đa 120 mẫu đo trực tiếp.
 Các mẫu local cũ hơn hoặc cách mẫu cloud mới nhất không quá 1 giây được loại
-khỏi biểu đồ ghép để tránh lặp do sai số timestamp. Cả năm biểu đồ đều dùng
+khỏi biểu đồ ghép để tránh lặp do sai số timestamp. Cả bốn biểu đồ đều dùng
 lịch sử cloud ghép với số đo trực tiếp.
 Tải lại trang sẽ nạp lại lịch sử đã gửi thành công lên ThingSpeak. Mẫu chưa
 gửi lên cloud chỉ có trong phiên trình duyệt. Không tiêu thụ hàng đợi upload.
 
 Ánh xạ theo dữ liệu firmware (không theo nhãn channel): field1 = nhiệt độ
-BMP180, field2 = áp suất hPa, field3 = độ ẩm %, field4 = nhiệt độ DHT11,
-field5 = độ cao (m). Mẫu cũ không có field5 được giữ là null, không vẽ thành 0.
+BMP180, field2 = áp suất hPa, field3 = độ ẩm %, field4 = nhiệt độ DHT11.
+Trang bỏ qua field5 của các bản ghi cũ và không hiển thị độ cao.
 
 - `recordSensor(j)`: nhận status, cập nhật giá trị, loại mẫu trùng, giới hạn lịch sử.
 - `loadHistory(force)`: tải lịch sử, chờ phản hồi 202 bằng polling 1 giây,
@@ -55,10 +55,16 @@ duyệt dùng chung một worker/cache. Chỉ ESP32 cần kết nối Internet; 
 có thể kết nối trực tiếp AP cấu hình. Không thay đổi tác vụ upload.
 
 Đặt `CONFIG_APP_TS_HISTORY_CHANNEL_ID` và `CONFIG_APP_TS_HISTORY_READ_KEY`
-trong `sdkconfig.secrets` (không commit), hoặc menuconfig → IoT Device Configuration.
-Cấu hình đã thiết lập cho channel 3515047. Khi sửa giá trị mặc định, lưu ý
-`sdkconfig` hiện tại được ưu tiên. Read Key gửi bằng header THINGSPEAKAPIKEY,
-không nhúng vào HTML hay trả về qua endpoint lịch sử.
+trong `sdkconfig.secrets` (không commit) để đặt mặc định ban đầu, hoặc sửa
+**Channel ID** và **Read API Key** trên tab ThingSpeak. Giá trị lưu trên web
+được giữ trong NVS và có hiệu lực ngay; không cần build lại. Nếu channel công
+khai, có thể để Read API Key trống. Khi thay key hoặc Channel ID, cache lịch sử
+được xoá; worker đang chạy với key cũ sẽ không ghi đè cache mới. Read Key gửi
+bằng header THINGSPEAKAPIKEY, không nằm trong URL ThingSpeak hay endpoint lịch
+sử. Tab cấu hình có Basic Auth như các phần khác của web server.
+
+NVS cũ chứa cấu hình ThingSpeak chưa có Read API Key vẫn được đọc: các trường
+đã lưu được giữ nguyên, Read Key mặc định lấy từ `sdkconfig.secrets`.
 
 Tài liệu API: https://www.mathworks.com/help/thingspeak/readdata.html
 và https://www.mathworks.com/help/thingspeak/http-headers.html

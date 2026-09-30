@@ -2,7 +2,7 @@
 
 [English](README.md) | **Tiếng Việt**
 
-Firmware ESP-IDF cho ESP32: đọc BMP180 (nhiệt độ, áp suất, độ cao) và DHT11 (độ ẩm, nhiệt độ),
+Firmware ESP-IDF cho ESP32: đọc BMP180 (nhiệt độ, áp suất) và DHT11 (độ ẩm, nhiệt độ),
 lọc nhiễu, gom mỗi chu kỳ thành một object dữ liệu, xếp vào pool cố định rồi gửi lên ThingSpeak.
 Wi-Fi và ThingSpeak được cấu hình qua trang web chạy ngay trên thiết bị.
 
@@ -333,7 +333,6 @@ Object dữ liệu (`sensor_sample_t`, `lib/data_pool/data_pool.h`):
 | `valid` | bit mask | `SAMPLE_VALID_BMP180`, `SAMPLE_VALID_DHT11` |
 | `bmp_temperature_c` | °C | BMP180, đã lọc |
 | `pressure_hpa` | hPa | BMP180, đã lọc |
-| `altitude_m` | m | tính từ áp suất đã lọc và áp suất mực nước biển |
 | `humidity_percent` | %RH | DHT11, đã lọc |
 | `dht_temperature_c` | °C | DHT11, đã lọc |
 
@@ -539,7 +538,7 @@ Write key chỉ gồm chữ và số vì được ghép thẳng vào URL.
 | `APP_DEFAULT_WIFI_SSID` / `_PASSWORD` | rỗng | Chỉ dùng khi NVS chưa có Wi-Fi |
 | `APP_SENSOR_FAKE_DATA` | bật trong `sdkconfig.defaults` | Dữ liệu giả, không cần cảm biến |
 
-Menu khác: **BMP180 Configuration** (SDA, SCL, áp suất mực nước biển), **ThingSpeak Configuration**
+Menu khác: **BMP180 Configuration** (SDA, SCL), **ThingSpeak Configuration**
 (GPIO DHT11).
 
 Hằng số lúc biên dịch:
