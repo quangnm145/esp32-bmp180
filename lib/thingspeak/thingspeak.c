@@ -15,6 +15,7 @@
 #include "esp_log.h"
 #include "esp_netif_sntp.h"
 #include "esp_timer.h"
+#include "sdkconfig.h"
 
 static const char *TAG = "THINGSPEAK";
 
@@ -236,6 +237,11 @@ static void worker_task(void *arg)
 
     while (true) {
         xTaskNotifyWait(0, UINT32_MAX, NULL, portMAX_DELAY);
+
+#if CONFIG_APP_SENSOR_FAKE_DATA
+        /* Keep fake samples available to the web UI without uploading them. */
+        continue;
+#endif
 
         app_thingspeak_config_t config;
         app_config_get_thingspeak(&config);

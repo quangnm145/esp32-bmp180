@@ -11,6 +11,9 @@ Worker được đánh thức bằng task notify:
 - `THINGSPEAK_NOTIFY_TICK`: từ ISR `app_tick` mỗi 1 s
 - `THINGSPEAK_NOTIFY_DATA`: `sensor_service` vừa đẩy object mới vào `data_pool`
 
+Khi bật `CONFIG_APP_SENSOR_FAKE_DATA`, worker không gửi dữ liệu lên ThingSpeak;
+mẫu giả vẫn nằm trong pool để web hiển thị.
+
 Mỗi lần thức, worker chỉ gửi khi ThingSpeak được bật, có API key, `network_ready()`
 trả về true, pool có dữ liệu và đã qua `THINGSPEAK_MIN_INTERVAL_MS` (15 s) từ lần gửi trước.
 Mẫu khởi động được tạo sau khoảng 30 giây và gửi ngay khi Wi-Fi sẵn sàng;
